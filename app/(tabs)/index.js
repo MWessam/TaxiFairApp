@@ -1,6 +1,6 @@
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Dimensions, ScrollView, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/constants/ThemeContext';
@@ -14,12 +14,28 @@ export default function Home() {
   const router = useRouter();
   const { theme, currentGovernorate, changeGovernorate } = useTheme();
   const [showGovernorateModal, setShowGovernorateModal] = useState(false);
+  const [isRouterReady, setIsRouterReady] = useState(false);
+  const routerRef = useRef(router);
   const availableGovernorates = getAvailableGovernorates();
   const currentGovData = availableGovernorates.find(gov => gov.key === currentGovernorate);
 
   useEffect(() => {
     configureMapbox();
-  }, []);
+    // Ensure router is ready
+    if (router) {
+      routerRef.current = router;
+      setIsRouterReady(true);
+    } else {
+      // Fallback: try to get router after a short delay
+      const timer = setTimeout(() => {
+        if (router) {
+          routerRef.current = router;
+          setIsRouterReady(true);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [router]);
 
   // Animation values for buttons
   const buttonScale1 = new Animated.Value(1);
@@ -43,7 +59,19 @@ export default function Home() {
         duration: 100,
         useNativeDriver: true,
       }),
-    ]).start(callback);
+    ]).start(() => {
+      // Use routerRef.current to ensure we always have the latest router
+      if (routerRef.current) {
+        callback();
+      } else {
+        console.log('Router not available, retrying...');
+        setTimeout(() => {
+          if (routerRef.current) {
+            callback();
+          }
+        }, 100);
+      }
+    });
   };
 
   const styles = createStyles(theme);
@@ -78,7 +106,7 @@ export default function Home() {
             <Animated.View style={{ transform: [{ scale: buttonScale1 }] }}>
               <TouchableOpacity 
                 style={styles.mainButton} 
-                onPress={() => animateButton(buttonScale1, () => router.push('/(tabs)/SubmitTrip'))}
+                onPress={() => animateButton(buttonScale1, () => routerRef.current?.push('/(tabs)/SubmitTrip'))}
                 activeOpacity={0.8}
               >
                 <Text style={styles.buttonIcon}>🚗</Text>
@@ -90,7 +118,7 @@ export default function Home() {
             <Animated.View style={{ transform: [{ scale: buttonScale2 }] }}>
               <TouchableOpacity 
                 style={styles.mainButton} 
-                onPress={() => animateButton(buttonScale2, () => router.push('/(other)/EstimateFare'))}
+                onPress={() => animateButton(buttonScale2, () => routerRef.current?.push('/(other)/EstimateFare'))}
                 activeOpacity={0.8}
               >
                 <Text style={styles.buttonIcon}>💰</Text>
@@ -102,7 +130,7 @@ export default function Home() {
             <Animated.View style={{ transform: [{ scale: buttonScale3 }] }}>
               <TouchableOpacity 
                 style={styles.mainButton} 
-                onPress={() => animateButton(buttonScale3, () => router.push('/(tabs)/TrackRide'))}
+                onPress={() => animateButton(buttonScale3, () => routerRef.current?.push('/(tabs)/TrackRide'))}
                 activeOpacity={0.8}
               >
                 <Text style={styles.buttonIcon}>📍</Text>

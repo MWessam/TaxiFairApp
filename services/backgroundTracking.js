@@ -43,8 +43,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
       // Save updated tracking data
       await saveTrackingData(trackingData);
       
-      // Update notification with current status
-      await updateTrackingNotification(trackingData);
+      // Don't update notification - keep it simple and persistent
+      // The notification will show "Tap to stop tracking" and that's enough
     }
   }
 });
@@ -184,7 +184,7 @@ async function showTrackingNotification(trackingData) {
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: '🚗 Taxi Tracking Active',
-        body: 'Your ride is being tracked. Tap to stop tracking.',
+        body: 'Your ride is being tracked in the background. Tap to stop tracking.',
         data: { action: 'stop_tracking' },
         sticky: true,
         autoDismiss: false,
@@ -207,6 +207,7 @@ async function updateTrackingNotification(trackingData) {
       const distance = calculateDistance(trackingData.route);
       const duration = calculateDuration(trackingData.startTime);
       
+      // Use the same notification ID to update the existing notification
       await Notifications.scheduleNotificationAsync({
         identifier: trackingData.notificationId,
         content: {
