@@ -18,6 +18,7 @@ export default function TripForm({ mode = 'submit' }) {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { theme } = useTheme();
+
   const [from, setFrom] = useState({ address: '', lat: null, lng: null });
   const [to, setTo] = useState({ address: '', lat: null, lng: null });
   const [fare, setFare] = useState('');
@@ -104,12 +105,17 @@ export default function TripForm({ mode = 'submit' }) {
     (async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
+        console.log('Status:', status);
+        console.log('Is Mounted:', isMounted);
         if (status === 'granted' && isMounted) {
           let loc = await Location.getCurrentPositionAsync({});
           console.log('Location:', loc);
           if (isMounted) {
             setCurrentLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
           }
+        }
+        else{
+          Alert.alert('يرجى السماح للتطبيق بالوصول إلى الموقع');
         }
       } catch (error) {
         console.log('Location error:', error);
@@ -131,6 +137,16 @@ export default function TripForm({ mode = 'submit' }) {
       });
     }
   }, [currentLocation, from, to]);
+
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Cleanup when component unmounts
+      if (cameraRef.current) {
+        cameraRef.current = null;
+      }
+    };
+  }, []);
 
   const handleSubmit = async () => {
     // Validation based on mode
@@ -264,81 +280,34 @@ export default function TripForm({ mode = 'submit' }) {
   if (!isScreenFocused) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.background }}>
-        <MapboxGL.MapView style={StyleSheet.absoluteFill}>
-          <MapboxGL.Camera
-            zoomLevel={14}
-            centerCoordinate={getMapCenter()}
-            animationEnabled={false}
-          />
-          {from.lat && from.lng && (
-            <MapboxGL.PointAnnotation id="from" coordinate={[from.lng, from.lat]}>
-              <View style={{ backgroundColor: theme.primary, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
-            </MapboxGL.PointAnnotation>
-          )}
-          {to.lat && to.lng && (
-            <MapboxGL.PointAnnotation id="to" coordinate={[to.lng, to.lat]}>
-              <View style={{ backgroundColor: theme.accent, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
-            </MapboxGL.PointAnnotation>
-          )}
-          {routeCoords.length > 0 && (
-            <MapboxGL.ShapeSource id="routeSource" shape={{
-              type: 'Feature',
-              geometry: {
-                type: 'LineString',
-                coordinates: routeCoords,
-              },
-            }}>
-              <MapboxGL.LineLayer id="routeLine" style={{ lineColor: theme.primary, lineWidth: 4 }} />
-            </MapboxGL.ShapeSource>
-          )}
-          {/* {currentLocation && (
-            <MapboxGL.UserLocation 
-              visible={true} 
-              showsUserHeadingIndicator={true}
-              onUpdate={(location) => {
-                // Safe location update handler
-                if (location && location.coords) {
-                  setCurrentLocation({
-                    lat: location.coords.latitude,
-                    lng: location.coords.longitude
-                  });
-                }
-              }}
+        <MapboxGL.MapView key="submitTripUnfocused" style={StyleSheet.absoluteFill}>
+            <MapboxGL.Camera
+              zoomLevel={14}
+              centerCoordinate={getMapCenter()}
+              animationEnabled={false}
             />
-          )} */}
-        </MapboxGL.MapView>
-      </View>
-    );
-  }
-
-  return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
-        <View style={{ flex: 1, backgroundColor: theme.background }}>
-          <MapboxGL.MapView style={StyleSheet.absoluteFill}>
-            <MapboxGL.Camera ref={cameraRef} />
             {from.lat && from.lng && (
-              <MapboxGL.PointAnnotation id="from" coordinate={[from.lng, from.lat]}>
+              <MapboxGL.PointAnnotation id="submitTripFromUnfocused" coordinate={[from.lng, from.lat]}>
                 <View style={{ backgroundColor: theme.primary, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
               </MapboxGL.PointAnnotation>
             )}
             {to.lat && to.lng && (
-              <MapboxGL.PointAnnotation id="to" coordinate={[to.lng, to.lat]}>
+              <MapboxGL.PointAnnotation id="submitTripToUnfocused" coordinate={[to.lng, to.lat]}>
                 <View style={{ backgroundColor: theme.accent, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
               </MapboxGL.PointAnnotation>
             )}
             {routeCoords.length > 0 && (
-              <MapboxGL.ShapeSource id="routeSource" shape={{
+              <MapboxGL.ShapeSource id="submitTripRouteSourceUnfocused" shape={{
                 type: 'Feature',
                 geometry: {
                   type: 'LineString',
                   coordinates: routeCoords,
                 },
               }}>
-                <MapboxGL.LineLayer id="routeLine" style={{ lineColor: theme.primary, lineWidth: 4 }} />
+                <MapboxGL.LineLayer id="submitTripRouteLineUnfocused" style={{ lineColor: theme.primary, lineWidth: 4 }} />
               </MapboxGL.ShapeSource>
             )}
-            {/* {currentLocation && (
+            {currentLocation && (
               <MapboxGL.UserLocation 
                 visible={true} 
                 showsUserHeadingIndicator={true}
@@ -351,10 +320,57 @@ export default function TripForm({ mode = 'submit' }) {
                     });
                   }
                 }}
-              />
-            )} */}
-          </MapboxGL.MapView>
-          <BottomSheet
+                          />
+          )}
+        </MapboxGL.MapView>
+      </View>
+    );
+  }
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <BottomSheetModalProvider>
+        <View style={{ flex: 1, backgroundColor: theme.background }}>
+          <MapboxGL.MapView key="submitTripFocused" style={StyleSheet.absoluteFill}>
+            <MapboxGL.Camera ref={cameraRef} />
+            {from.lat && from.lng && (
+              <MapboxGL.PointAnnotation id="submitTripFrom" coordinate={[from.lng, from.lat]}>
+                <View style={{ backgroundColor: theme.primary, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
+              </MapboxGL.PointAnnotation>
+            )}
+            {to.lat && to.lng && (
+              <MapboxGL.PointAnnotation id="submitTripTo" coordinate={[to.lng, to.lat]}>
+                <View style={{ backgroundColor: theme.accent, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
+              </MapboxGL.PointAnnotation>
+            )}
+            {routeCoords.length > 0 && (
+              <MapboxGL.ShapeSource id="submitTripRouteSource" shape={{
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: routeCoords,
+                },
+              }}>
+                <MapboxGL.LineLayer id="submitTripRouteLine" style={{ lineColor: theme.primary, lineWidth: 4 }} />
+              </MapboxGL.ShapeSource>
+            )}
+            {currentLocation && (
+              <MapboxGL.UserLocation 
+                visible={true} 
+                showsUserHeadingIndicator={true}
+                onUpdate={(location) => {
+                  // Safe location update handler
+                  if (location && location.coords) {
+                    setCurrentLocation({
+                      lat: location.coords.latitude,
+                      lng: location.coords.longitude
+                    });
+                  }
+                }}
+                          />
+          )}
+        </MapboxGL.MapView>
+        <BottomSheet
             ref={bottomSheetRef}
             index={0}
             snapPoints={snapPoints}

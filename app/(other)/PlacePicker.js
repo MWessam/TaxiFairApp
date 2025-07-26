@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Modal, Dimensions, Alert } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
@@ -30,12 +30,18 @@ export default function PlacePicker() {
     (async () => {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
+        console.log('Status:', status);
+        console.log('Is Mounted:', isMounted);
         if (status === 'granted' && isMounted) {
           let loc = await Location.getCurrentPositionAsync({});
+          console.log('Picker Location:', loc);
           if (isMounted) {
             setCurrentLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
             setMapPin({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
           }
+        }
+        else{
+          Alert.alert('يرجى السماح للتطبيق بالوصول إلى الموقع');
         }
       } catch (error) {
         console.log('Location error:', error);
@@ -218,6 +224,19 @@ export default function PlacePicker() {
     }
   }, [currentLocation, mapPin]);
 
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Cleanup when component unmounts
+      if (cameraRef.current) {
+        cameraRef.current = null;
+      }
+      if (mapRef.current) {
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Header with back button */}
@@ -267,9 +286,11 @@ export default function PlacePicker() {
         statusBarTranslucent={true}
       >
         <View style={styles.mapContainer}>
-          <MapboxGL.MapView
-            ref={mapRef}
-            style={styles.map}
+          {showMap && (
+            <MapboxGL.MapView
+              key="placePicker"
+              ref={mapRef}
+              style={styles.map}
             onRegionDidChange={async () => {
               try {
                 if (mapRef.current) {
@@ -285,16 +306,17 @@ export default function PlacePicker() {
           >
             <MapboxGL.Camera ref={cameraRef} />
             <MapboxGL.PointAnnotation
-              id="pin"
+              id="placePickerPin"
               coordinate={[mapPin.longitude, mapPin.latitude]}
             />
-            {/* {currentLocation && (
+            {currentLocation && (
               <MapboxGL.UserLocation 
                 visible={true} 
                 showsUserHeadingIndicator={true}
-              /> */}
-            {/* )} */}
+              />
+            )}
           </MapboxGL.MapView>
+          )}
           
           {/* Back Button */}
           <TouchableOpacity style={styles.mapBackButton} onPress={() => setShowMap(false)}>

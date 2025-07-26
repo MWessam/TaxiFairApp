@@ -32,6 +32,16 @@ export default function TrackRide() {
     }
   }, [currentLocation]); // Dependency: only run when currentLocation changes
 
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Cleanup when component unmounts
+      if (cameraRef.current) {
+        cameraRef.current = null;
+      }
+    };
+  }, []);
+
   const startTracking = () => {
     if (!currentLocation) {
       Alert.alert('Could not get location', 'Please make sure location services are enabled and try again.');
@@ -128,7 +138,7 @@ export default function TrackRide() {
 
   return (
     <View style={styles.container}>
-      <MapboxGL.MapView style={styles.map}>
+      <MapboxGL.MapView key="trackRide" style={styles.map}>
         {/* The Camera is now completely separate and manually controlled */}
         <MapboxGL.Camera ref={cameraRef} />
         
@@ -141,23 +151,23 @@ export default function TrackRide() {
 
         {/* --- The rest of your map components are fine --- */}
         {route.length > 0 && (
-          <MapboxGL.ShapeSource id="routeSource" shape={{
+          <MapboxGL.ShapeSource id="trackRideRouteSource" shape={{
             type: 'Feature',
             geometry: {
               type: 'LineString',
               coordinates: route.map(p => [p.longitude, p.latitude]),
             },
           }}>
-            <MapboxGL.LineLayer id="routeLine" style={{ lineColor: '#d32f2f', lineWidth: 4 }} />
+            <MapboxGL.LineLayer id="trackRideRouteLine" style={{ lineColor: '#d32f2f', lineWidth: 4 }} />
           </MapboxGL.ShapeSource>
         )}
         {startLoc && (
-          <MapboxGL.PointAnnotation id="start" coordinate={[startLoc.longitude, startLoc.latitude]}>
+          <MapboxGL.PointAnnotation id="trackRideStart" coordinate={[startLoc.longitude, startLoc.latitude]}>
             <View style={styles.markerGreen} />
           </MapboxGL.PointAnnotation>
         )}
         {endLoc && (
-          <MapboxGL.PointAnnotation id="end" coordinate={[endLoc.longitude, endLoc.latitude]}>
+          <MapboxGL.PointAnnotation id="trackRideEnd" coordinate={[endLoc.longitude, endLoc.latitude]}>
             <View style={styles.markerRed} />
           </MapboxGL.PointAnnotation>
         )}
