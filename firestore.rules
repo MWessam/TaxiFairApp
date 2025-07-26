@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Completely block direct access to trips collection
+    match /trips/{tripId} {
+      allow read: if false;  // No one can read trip data directly
+      allow write: if false; // No one can write trip data directly
+    }
+    
+    // Allow authenticated users to read their own user data (if you add user profiles later)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Block all other collections by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+} 
