@@ -55,13 +55,7 @@ export default {
         }
       ],
       "expo-location",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/images/notification-icon.png",
-          "color": "#ffffff"
-        }
-      ]
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true
