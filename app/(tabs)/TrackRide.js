@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Linking } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useRouter } from 'expo-router';
 import { distillRoute, calculateRouteDistance, getGovernorateFromCoords, getAddressFromCoords } from '../../routeHelpers';
+import { startBackgroundTracking, stopBackgroundTracking, isTrackingActive, getCurrentTrackingData, setupNotificationHandler, clearTrackingData } from '../../services/backgroundTracking';
+import locationService from '../../services/locationService';
 
 // MapboxGL.setAccessToken("YOUR_MAPBOX_ACCESS_TOKEN");
 
@@ -15,9 +17,92 @@ export default function TrackRide() {
   const [passengers, setPassengers] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [backgroundTrackingActive, setBackgroundTrackingActive] = useState(false);
+  const [locationStatus, setLocationStatus] = useState('requesting'); // 'requesting', 'granted', 'denied'
 
   const cameraRef = useRef(null);
   const router = useRouter();
+
+  // Setup notification handler and subscribe to location service
+  useEffect(() => {
+    setupNotificationHandler();
+    
+    // Subscribe to location service updates
+    const unsubscribe = locationService.subscribe(({ location, status }) => {
+      setCurrentLocation(location);
+      setLocationStatus(status);
+    });
+    
+    // Check if background tracking is already active
+    checkBackgroundTrackingStatus();
+    
+    // Cleanup subscription
+    return unsubscribe;
+  }, []);
+
+  // Clear any stale tracking data on component mount
+  useEffect(() => {
+    const clearStaleData = async () => {
+      try {
+        const trackingData = await getCurrentTrackingData();
+        console.log('Checking for stale tracking data:', trackingData);
+        
+        if (trackingData && (!trackingData.isTracking || !trackingData.startLocation || !trackingData.route)) {
+          console.log('Clearing stale tracking data');
+          await clearTrackingData();
+        }
+      } catch (error) {
+        console.error('Error clearing stale data:', error);
+        // If there's any error, clear the data to be safe
+        await clearTrackingData();
+      }
+    };
+    
+    clearStaleData();
+  }, []);
+
+  const requestLocationPermission = async () => {
+    await locationService.requestLocationPermission();
+  };
+
+  const resetTracking = async () => {
+    try {
+      await clearTrackingData();
+      setTracking(false);
+      setBackgroundTrackingActive(false);
+      setRoute([]);
+      setStartLoc(null);
+      setEndLoc(null);
+      setStartTime(null);
+      console.log('Tracking reset successfully');
+    } catch (error) {
+      console.error('Error resetting tracking:', error);
+    }
+  };
+
+  const checkBackgroundTrackingStatus = async () => {
+    try {
+      const isActive = await isTrackingActive();
+      console.log('Background tracking status check:', isActive);
+      
+      // TEMPORARILY DISABLE SESSION RESTORATION TO DEBUG
+      if (isActive) {
+        console.log('Found active tracking session, but skipping restoration for debugging');
+        await clearTrackingData(); // Clear any existing data
+        setBackgroundTrackingActive(false);
+        setTracking(false);
+        return;
+      }
+      
+      setBackgroundTrackingActive(false);
+      setTracking(false);
+    } catch (error) {
+      console.error('Error checking background tracking status:', error);
+      // Reset to safe state
+      setBackgroundTrackingActive(false);
+      setTracking(false);
+    }
+  };
 
   // This effect manually moves the camera. It runs only when `currentLocation` changes
   // and we are NOT in tracking mode.
@@ -42,34 +127,79 @@ export default function TrackRide() {
     };
   }, []);
 
-  const startTracking = () => {
+  const startTracking = async () => {
     if (!currentLocation) {
       Alert.alert('Could not get location', 'Please make sure location services are enabled and try again.');
       return;
     }
-    setTracking(true);
-    setRoute([]);
-    setEndLoc(null);
-    setStartTime(new Date());
-    setStartLoc(currentLocation);
-    setRoute([currentLocation]);
+
+    setLoading(true);
+    console.log('Starting tracking with location:', currentLocation);
+    
+    try {
+      // Start background tracking with timeout
+      const trackingPromise = startBackgroundTracking(currentLocation);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Background tracking timeout')), 10000)
+      );
+      
+      const success = await Promise.race([trackingPromise, timeoutPromise]);
+      console.log('Background tracking result:', success);
+      
+      if (success) {
+        setTracking(true);
+        setRoute([currentLocation]);
+        setEndLoc(null);
+        setStartTime(new Date());
+        setStartLoc(currentLocation);
+        setBackgroundTrackingActive(true);
+        
+        // Show a simple success message without alert dialog
+        console.log('Background tracking started successfully');
+      } else {
+        console.log('Background tracking failed, starting foreground tracking instead');
+        // Fallback to foreground tracking if background fails
+        setTracking(true);
+        setRoute([currentLocation]);
+        setEndLoc(null);
+        setStartTime(new Date());
+        setStartLoc(currentLocation);
+        setBackgroundTrackingActive(false);
+        
+        Alert.alert(
+          'Background Tracking Unavailable', 
+          'Background tracking is not available. Your ride will be tracked while the app is open.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error starting tracking:', error);
+      Alert.alert('Error', 'Failed to start tracking. Please try again.');
+    }
+    
+    setLoading(false);
   };
 
   const endTracking = async () => {
-    // ... (Your endTracking logic is fine, no changes needed here)
-    setTracking(false);
-    
-    if (route.length === 0 || !startLoc) {
-        Alert.alert("Tracking Error", "No route was recorded.");
-        return;
-    }
-
-    const endTimeNow = new Date();
-    const endLocation = route[route.length - 1];
-    setEndLoc(endLocation);
     setLoading(true);
-
+    
     try {
+      // Stop background tracking
+      await stopBackgroundTracking();
+      
+      setTracking(false);
+      setBackgroundTrackingActive(false);
+      
+      if (route.length === 0 || !startLoc) {
+        Alert.alert("Tracking Error", "No route was recorded.");
+        setLoading(false);
+        return;
+      }
+
+      const endTimeNow = new Date();
+      const endLocation = route[route.length - 1];
+      setEndLoc(endLocation);
+
       const durationMs = endTimeNow.getTime() - startTime.getTime();
       const durationMinutes = Math.round(durationMs / (1000 * 60));
       
@@ -150,7 +280,7 @@ export default function TrackRide() {
         />
 
         {/* --- The rest of your map components are fine --- */}
-        {route.length > 0 && (
+        {route.length > 0 && route.every(p => p && typeof p.longitude === 'number' && typeof p.latitude === 'number') && (
           <MapboxGL.ShapeSource id="trackRideRouteSource" shape={{
             type: 'Feature',
             geometry: {
@@ -161,12 +291,12 @@ export default function TrackRide() {
             <MapboxGL.LineLayer id="trackRideRouteLine" style={{ lineColor: '#d32f2f', lineWidth: 4 }} />
           </MapboxGL.ShapeSource>
         )}
-        {startLoc && (
+        {startLoc && typeof startLoc.longitude === 'number' && typeof startLoc.latitude === 'number' && (
           <MapboxGL.PointAnnotation id="trackRideStart" coordinate={[startLoc.longitude, startLoc.latitude]}>
             <View style={styles.markerGreen} />
           </MapboxGL.PointAnnotation>
         )}
-        {endLoc && (
+        {endLoc && typeof endLoc.longitude === 'number' && typeof endLoc.latitude === 'number' && (
           <MapboxGL.PointAnnotation id="trackRideEnd" coordinate={[endLoc.longitude, endLoc.latitude]}>
             <View style={styles.markerRed} />
           </MapboxGL.PointAnnotation>
@@ -174,8 +304,44 @@ export default function TrackRide() {
       </MapboxGL.MapView>
 
       <View style={styles.bottomPanel}>
-        {/* --- Your bottom panel is fine, no changes needed --- */}
         <Text style={styles.title}>ابدأ تتبع رحلتك</Text>
+        
+        {/* Location Status */}
+        {locationStatus === 'requesting' && (
+          <View style={styles.locationStatus}>
+            <ActivityIndicator size="small" color="#d32f2f" />
+            <Text style={styles.locationStatusText}>جاري طلب إذن الموقع الدقيق...</Text>
+          </View>
+        )}
+        
+        {locationStatus === 'denied' && (
+          <View style={[styles.locationStatus, { backgroundColor: '#ffebee' }]}>
+            <Text style={[styles.locationStatusText, { color: '#c62828' }]}>❌ الموقع الدقيق مطلوب</Text>
+            <TouchableOpacity 
+              style={styles.retryButton} 
+              onPress={requestLocationPermission}
+            >
+              <Text style={styles.retryButtonText}>إعادة المحاولة</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        {locationStatus === 'granted' && currentLocation && (
+          <View style={[styles.locationStatus, { backgroundColor: '#e8f5e8' }]}>
+            <Text style={[styles.locationStatusText, { color: '#2e7d32' }]}>✅ الموقع الدقيق متاح</Text>
+            <Text style={styles.locationCoords}>
+              {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+            </Text>
+          </View>
+        )}
+        
+        {backgroundTrackingActive && (
+          <View style={styles.backgroundStatus}>
+            <Text style={styles.backgroundStatusText}>🔄 التتبع يعمل في الخلفية</Text>
+            <Text style={styles.backgroundStatusSubtext}>يمكنك تصغير التطبيق والاستمرار في التتبع</Text>
+          </View>
+        )}
+        
         <TextInput
           style={styles.input}
           placeholder="عدد الركاب (اختياري)"
@@ -183,21 +349,43 @@ export default function TrackRide() {
           value={passengers}
           onChangeText={setPassengers}
         />
+        
         {!tracking ? (
-          <TouchableOpacity style={styles.button} onPress={startTracking} disabled={!currentLocation}>
-            <Text style={styles.buttonText}>ابدأ التتبع</Text>
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={startTracking} 
+            disabled={!currentLocation || loading || locationStatus !== 'granted'}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? 'جاري البدء...' : 'ابدأ التتبع'}
+            </Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={[styles.button, { backgroundColor: '#222' }]} onPress={endTracking}>
-            <Text style={styles.buttonText}>انهاء التتبع</Text>
+          <TouchableOpacity 
+            style={[styles.button, { backgroundColor: '#222' }]} 
+            onPress={endTracking}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? 'جاري الإنهاء...' : 'انهاء التتبع'}
+            </Text>
           </TouchableOpacity>
         )}
+        
         {loading && (
           <View style={styles.loaderContainer}>
             <ActivityIndicator size="large" color="#d32f2f" />
             <Text style={styles.loaderText}>جاري المعالجة...</Text>
           </View>
         )}
+        
+        {/* Debug reset button - remove in production */}
+        <TouchableOpacity 
+          style={[styles.button, { backgroundColor: '#666', marginTop: 10 }]} 
+          onPress={resetTracking}
+        >
+          <Text style={styles.buttonText}>Reset Tracking (Debug)</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -270,5 +458,60 @@ const styles = StyleSheet.create({
     loaderText: {
         color: '#d32f2f',
         marginTop: 8
+    },
+    backgroundStatus: {
+        backgroundColor: '#e8f5e8',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#4caf50',
+    },
+    backgroundStatusText: {
+        color: '#2e7d32',
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 4,
+    },
+    backgroundStatusSubtext: {
+        color: '#388e3c',
+        fontSize: 14,
+        textAlign: 'center',
+    },
+    locationStatus: {
+        backgroundColor: '#fff3e0',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#ff9800',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    locationStatusText: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginLeft: 8,
+    },
+    locationCoords: {
+        fontSize: 12,
+        color: '#666',
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    retryButton: {
+        backgroundColor: '#d32f2f',
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        marginLeft: 12,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: 'bold',
     }
 });

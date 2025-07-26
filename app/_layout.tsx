@@ -1,20 +1,60 @@
 // _layout.tsx
 import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
+import { useEffect } from 'react';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemeProvider } from '@/constants/ThemeContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { setupNotificationHandler, getPendingFareResults } from '../services/backgroundTracking';
+import locationService from '../services/locationService';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+
+  // Setup notification handler and initialize location service
+  useEffect(() => {
+    setupNotificationHandler();
+    locationService.initialize();
+    
+    // Check for pending fare results from notification
+    const checkPendingResults = async () => {
+      try {
+        const pendingData = await getPendingFareResults();
+        if (pendingData) {
+          console.log('Found pending fare results, navigating...');
+          // Navigate to fare results with the data
+          router.push({
+            pathname: '/(other)/FareResults',
+            params: {
+              from: pendingData.startLocation?.name || 'Unknown',
+              to: pendingData.route?.[pendingData.route.length - 1]?.name || 'Unknown',
+              time: new Date(pendingData.startTime).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+              duration: Math.round((Date.now() - new Date(pendingData.startTime).getTime()) / (1000 * 60)).toString(),
+              passengers: '1',
+              estimate: '38',
+              distance: '0.00',
+              governorate: 'Unknown',
+              mode: 'track',
+              tripData: JSON.stringify(pendingData)
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error checking pending results:', error);
+      }
+    };
+    
+    checkPendingResults();
+  }, []);
 
   if (!loaded) {
     // Async font loading only occurs in development.

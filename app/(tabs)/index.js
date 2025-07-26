@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/constants/ThemeContext';
 import { getAvailableGovernorates } from '@/constants/Colors';
 import { configureMapbox } from '@/mapboxProvider';
+import LocationPermissionRequest from '../../components/LocationPermissionRequest';
 
 const { width, height } = Dimensions.get('window');
 
@@ -49,6 +50,9 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
+      {/* Location Permission Request */}
+      <LocationPermissionRequest />
+      
       {/* Header with governorate selector */}
       <View style={styles.header}>
         <Text style={styles.appTitle}>تاكسي مصر</Text>

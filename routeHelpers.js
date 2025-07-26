@@ -82,6 +82,18 @@ export async function getGovernorateFromCoords(lat, lng) {
     return '';
   }
 }
+export async function reverseGeocode(lat, lng){
+  try {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&language=ar,en`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Mapbox Geocoding error');
+    const data = await res.json();
+    return data.features && data.features[0] && data.features[0].place_name || '';
+  } catch (err) {
+    console.error('Error fetching address:', err);
+    return '';
+  }
+};
 
 // Gets the full address name from coordinates using Mapbox Geocoding API
 export async function getAddressFromCoords(lat, lng) {
@@ -95,4 +107,32 @@ export async function getAddressFromCoords(lat, lng) {
     console.error('Error fetching address:', err);
     return '';
   }
-} 
+}
+
+// Search places using Mapbox Geocoding API
+export async function searchPlacesMapbox(query, currentLocation = null) {
+  try {
+    let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&language=ar,en&limit=5&types=poi,place,address`;
+    
+    // Add proximity if we have current location
+    if (currentLocation) {
+      url += `&proximity=${currentLocation.longitude},${currentLocation.latitude}`;
+    }
+    
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Mapbox Geocoding error');
+    const data = await res.json();
+    
+    // Transform Mapbox response to match the expected format
+    return data.features.map(feature => ({
+      place_id: feature.id,
+      display_name: feature.place_name,
+      lat: feature.center[1],
+      lon: feature.center[0],
+      type: feature.place_type[0]
+    }));
+  } catch (err) {
+    console.error('Error searching places:', err);
+    return [];
+  }
+}

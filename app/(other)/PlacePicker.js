@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Activity
 import MapboxGL from '@rnmapbox/maps';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
+import { searchPlacesMapbox, reverseGeocode } from '../../routeHelpers';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -53,21 +54,7 @@ export default function PlacePicker() {
     };
   }, []);
 
-  // Calculate viewbox coordinates (5km radius)
-  const getViewbox = () => {
-    if (!currentLocation) return null;
-    
-    // 5km in degrees (approximate)
-    const latDelta = 5 / 111; // 1 degree ≈ 111km
-    const lngDelta = 5 / (111 * Math.cos(currentLocation.latitude * Math.PI / 180));
-    
-    const minLat = currentLocation.latitude - latDelta;
-    const maxLat = currentLocation.latitude + latDelta;
-    const minLng = currentLocation.longitude - lngDelta;
-    const maxLng = currentLocation.longitude + lngDelta;
-    
-    return `${minLng},${minLat},${maxLng},${maxLat}`;
-  };
+
 
   // Search locations
   const debouncedSearch = (query) => {
@@ -78,18 +65,7 @@ export default function PlacePicker() {
   const searchPlaces = async (query) => {
     setLoading(true);
     try {
-      const viewbox = getViewbox();
-      let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5&accept-language=ar,en`;
-      
-      // Add viewbox if we have current location
-      if (viewbox) {
-        url += `&viewbox=${viewbox}&bounded=0`;
-      }
-      
-      const res = await fetch(url, {
-        headers: { 'User-Agent': 'TaxiFairApp/1.0' },
-      });
-      const data = await res.json();
+      const data = await searchPlacesMapbox(query, currentLocation);
       setResults(data);
     } catch (err) {
       setResults([]);
@@ -159,23 +135,18 @@ export default function PlacePicker() {
     setMapPin({ latitude, longitude });
   };
 
-  const reverseGeocode = async () => {
-    setPinAddress('');
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${mapPin.latitude}&lon=${mapPin.longitude}&zoom=16&addressdetails=1`;
-      const res = await fetch(url, {
-        headers: { 'User-Agent': 'TaxiFairApp/1.0', 'Accept-Language': 'ar,en' },
-      });
-      const data = await res.json();
-      setPinAddress(data.display_name || '');
-    } catch (err) {
-      setPinAddress('');
-    }
-  };
+
 
   // When map pin moves, reverse geocode
   React.useEffect(() => {
-    if (showMap) reverseGeocode();
+    if (showMap) {
+      reverseGeocode(mapPin.latitude, mapPin.longitude).then(address => {
+        setPinAddress(address);
+      }).catch(err => {
+        console.error('Reverse geocoding error:', err);
+        setPinAddress('');
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapPin.latitude, mapPin.longitude, showMap]);
 

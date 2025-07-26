@@ -10,7 +10,19 @@ export default {
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location",
+          "background-processing",
+          "background-fetch"
+        ],
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app needs precise location access to accurately track your taxi rides in the background.",
+        "NSLocationWhenInUseUsageDescription": "This app needs precise location access to accurately track your taxi rides.",
+        "NSLocationTemporaryUsageDescriptionDictionary": {
+          "Taxi Tracking": "This app needs precise location to track your taxi ride distance and route."
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +30,13 @@ export default {
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.MedoWessam.TaxiOgraApp"
+      "package": "com.MedoWessam.TaxiOgraApp",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -36,7 +54,15 @@ export default {
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-location"
+      "expo-location",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#ffffff",
+          "sounds": ["./assets/sounds/notification.wav"]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

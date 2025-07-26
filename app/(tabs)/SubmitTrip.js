@@ -9,7 +9,7 @@ import { saveTrip } from '../../firestoreHelpers';
 import { useTheme } from '@/constants/ThemeContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
-import * as Location from 'expo-location';
+import locationService from '../../services/locationService';
 
 
 const { width, height } = Dimensions.get('window');
@@ -100,31 +100,15 @@ export default function TripForm({ mode = 'submit' }) {
   }, [from, to, isScreenFocused]);
 
   useEffect(() => {
-    let isMounted = true;
-    
-    (async () => {
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        console.log('Status:', status);
-        console.log('Is Mounted:', isMounted);
-        if (status === 'granted' && isMounted) {
-          let loc = await Location.getCurrentPositionAsync({});
-          console.log('Location:', loc);
-          if (isMounted) {
-            setCurrentLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
-          }
-        }
-        else{
-          Alert.alert('يرجى السماح للتطبيق بالوصول إلى الموقع');
-        }
-      } catch (error) {
-        console.log('Location error:', error);
+    // Subscribe to location service updates
+    const unsubscribe = locationService.subscribe(({ location, status }) => {
+      if (location) {
+        setCurrentLocation({ lat: location.latitude, lng: location.longitude });
       }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
+    });
+    
+    // Cleanup subscription
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
