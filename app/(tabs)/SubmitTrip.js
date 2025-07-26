@@ -291,7 +291,7 @@ export default function TripForm({ mode = 'submit' }) {
               <MapboxGL.LineLayer id="routeLine" style={{ lineColor: theme.primary, lineWidth: 4 }} />
             </MapboxGL.ShapeSource>
           )}
-          {currentLocation && (
+          {/* {currentLocation && (
             <MapboxGL.UserLocation 
               visible={true} 
               showsUserHeadingIndicator={true}
@@ -305,7 +305,7 @@ export default function TripForm({ mode = 'submit' }) {
                 }
               }}
             />
-          )}
+          )} */}
         </MapboxGL.MapView>
       </View>
     );
@@ -338,7 +338,7 @@ export default function TripForm({ mode = 'submit' }) {
                 <MapboxGL.LineLayer id="routeLine" style={{ lineColor: theme.primary, lineWidth: 4 }} />
               </MapboxGL.ShapeSource>
             )}
-            {currentLocation && (
+            {/* {currentLocation && (
               <MapboxGL.UserLocation 
                 visible={true} 
                 showsUserHeadingIndicator={true}
@@ -352,7 +352,7 @@ export default function TripForm({ mode = 'submit' }) {
                   }
                 }}
               />
-            )}
+            )} */}
           </MapboxGL.MapView>
           <BottomSheet
             ref={bottomSheetRef}

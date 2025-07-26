@@ -288,21 +288,12 @@ export default function PlacePicker() {
               id="pin"
               coordinate={[mapPin.longitude, mapPin.latitude]}
             />
-            {currentLocation && (
+            {/* {currentLocation && (
               <MapboxGL.UserLocation 
                 visible={true} 
                 showsUserHeadingIndicator={true}
-                onUpdate={(location) => {
-                  // Safe location update handler
-                  if (location && location.coords) {
-                    setCurrentLocation({
-                      latitude: location.coords.latitude,
-                      longitude: location.coords.longitude
-                    });
-                  }
-                }}
-              />
-            )}
+              /> */}
+            {/* )} */}
           </MapboxGL.MapView>
           
           {/* Back Button */}
