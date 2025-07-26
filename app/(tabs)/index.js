@@ -1,10 +1,11 @@
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Dimensions, ScrollView, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/constants/ThemeContext';
 import { getAvailableGovernorates } from '@/constants/Colors';
+import { configureMapbox } from '@/mapboxProvider';
 
 const { width, height } = Dimensions.get('window');
 
@@ -14,6 +15,10 @@ export default function Home() {
   const [showGovernorateModal, setShowGovernorateModal] = useState(false);
   const availableGovernorates = getAvailableGovernorates();
   const currentGovData = availableGovernorates.find(gov => gov.key === currentGovernorate);
+
+  useEffect(() => {
+    configureMapbox();
+  }, []);
 
   // Animation values for buttons
   const buttonScale1 = new Animated.Value(1);

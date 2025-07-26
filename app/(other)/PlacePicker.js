@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Modal, Dimensions } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT, UrlTile } from 'react-native-maps';
+import MapboxGL from '@rnmapbox/maps';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
 
@@ -21,32 +20,32 @@ export default function PlacePicker() {
   const [pinAddress, setPinAddress] = useState('');
   const [currentLocation, setCurrentLocation] = useState(null);
   const debounceRef = useRef();
+  const mapRef = useRef();
+  const cameraRef = useRef();
 
   // Get current location on component mount
   useEffect(() => {
-    getCurrentLocation();
+    let isMounted = true;
+    
+    (async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted' && isMounted) {
+          let loc = await Location.getCurrentPositionAsync({});
+          if (isMounted) {
+            setCurrentLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            setMapPin({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+          }
+        }
+      } catch (error) {
+        console.log('Location error:', error);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
-
-  const getCurrentLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('Location permission denied');
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
-      setCurrentLocation({ latitude, longitude });
-      
-      // Update map pin to current location if it's still default
-      if (mapPin.latitude === 30.0444 && mapPin.longitude === 31.2357) {
-        setMapPin({ latitude, longitude });
-      }
-    } catch (error) {
-      console.log('Error getting location:', error);
-    }
-  };
 
   // Calculate viewbox coordinates (5km radius)
   const getViewbox = () => {
@@ -149,12 +148,9 @@ export default function PlacePicker() {
     setPinAddress('');
   };
 
-  const handleMapRegionChange = (region) => {
-    setMapPin({ latitude: region.latitude, longitude: region.longitude });
-  };
-
-  const handleMapPinDragEnd = (e) => {
-    setMapPin(e.nativeEvent.coordinate);
+  const handleMapPinDragEnd = (event) => {
+    const { latitude, longitude } = event.geometry.coordinates;
+    setMapPin({ latitude, longitude });
   };
 
   const reverseGeocode = async () => {
@@ -211,6 +207,17 @@ export default function PlacePicker() {
     }, 100);
   };
 
+  useEffect(() => {
+    if (cameraRef.current && mapPin) {
+      cameraRef.current.setCamera({
+        centerCoordinate: [mapPin.longitude, mapPin.latitude],
+        zoomLevel: 14,
+        animationDuration: 0,
+        animationMode: 'none',
+      });
+    }
+  }, [currentLocation, mapPin]);
+
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Header with back button */}
@@ -260,29 +267,43 @@ export default function PlacePicker() {
         statusBarTranslucent={true}
       >
         <View style={styles.mapContainer}>
-          <MapView
+          <MapboxGL.MapView
+            ref={mapRef}
             style={styles.map}
-            provider={PROVIDER_DEFAULT}
-            initialRegion={{
-              latitude: mapPin.latitude,
-              longitude: mapPin.longitude,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
+            onRegionDidChange={async () => {
+              try {
+                if (mapRef.current) {
+                  const center = await mapRef.current.getCenter();
+                  if (center && center.length === 2) {
+                    setMapPin({ latitude: center[1], longitude: center[0] });
+                  }
+                }
+              } catch (error) {
+                console.log('Map region change error:', error);
+              }
             }}
-            onRegionChangeComplete={handleMapRegionChange}
-            mapType="standard"
           >
-            <Marker
-              coordinate={mapPin}
-              draggable
-              onDragEnd={handleMapPinDragEnd}
+            <MapboxGL.Camera ref={cameraRef} />
+            <MapboxGL.PointAnnotation
+              id="pin"
+              coordinate={[mapPin.longitude, mapPin.latitude]}
             />
-            <UrlTile
-              urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              maximumZ={19}
-              flipY={false}
-            />
-          </MapView>
+            {currentLocation && (
+              <MapboxGL.UserLocation 
+                visible={true} 
+                showsUserHeadingIndicator={true}
+                onUpdate={(location) => {
+                  // Safe location update handler
+                  if (location && location.coords) {
+                    setCurrentLocation({
+                      latitude: location.coords.latitude,
+                      longitude: location.coords.longitude
+                    });
+                  }
+                }}
+              />
+            )}
+          </MapboxGL.MapView>
           
           {/* Back Button */}
           <TouchableOpacity style={styles.mapBackButton} onPress={() => setShowMap(false)}>

@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Alert, Platform, ActivityIndicator } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT, UrlTile } from 'react-native-maps';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import MapboxGL from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { distillRoute, calculateRouteDistance, getGovernorateFromCoords, getAddressFromCoords } from '../../routeHelpers';
@@ -18,9 +18,44 @@ export default function TrackRide() {
   const [calculatedDuration, setCalculatedDuration] = useState('');
   const [passengers, setPassengers] = useState('');
   const [loading, setLoading] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState(null);
 
   const watchId = useRef(null);
+  const cameraRef = useRef();
   const router = useRouter();
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    (async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted' && isMounted) {
+          let loc = await Location.getCurrentPositionAsync({});
+          if (isMounted) {
+            setCurrentLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+          }
+        }
+      } catch (error) {
+        console.log('Location error:', error);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (cameraRef.current && getMapCenter()) {
+      cameraRef.current.setCamera({
+        centerCoordinate: getMapCenter(),
+        zoomLevel: 14,
+        animationDuration: 0,
+        animationMode: 'none',
+      });
+    }
+  }, [currentLocation, startLoc, route]);
 
   const startTracking = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -133,59 +168,93 @@ export default function TrackRide() {
     }
   };
 
+  // Get map center based on route
+  const getMapCenter = () => {
+    if (route.length > 0) {
+      const midIndex = Math.floor(route.length / 2);
+      const midPoint = route[midIndex];
+      return [midPoint.longitude, midPoint.latitude];
+    } else if (startLoc) {
+      return [startLoc.longitude, startLoc.latitude];
+    } else if (currentLocation) {
+      return [currentLocation.longitude, currentLocation.latitude];
+    } else {
+      return [31.2357, 30.0444];
+    }
+  };
+
+  // Convert route to MapboxGL format
+  const getRouteCoordinates = () => {
+    return route.map(point => [point.longitude, point.latitude]);
+  };
+
   return (
     <View style={{ flex: 1 }}>
-      <MapView
-        style={{ flex: 1 }}
-        provider={PROVIDER_DEFAULT}
-        initialRegion={{
-          latitude: 30.0444,
-          longitude: 31.2357,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
-      >
+      <MapboxGL.MapView style={{ flex: 1 }}>
+        <MapboxGL.Camera ref={cameraRef} />
         {route.length > 0 && (
-          <Polyline coordinates={route} strokeColor="#d32f2f" strokeWidth={4} />
+          <MapboxGL.ShapeSource id="routeSource" shape={{
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: route.map(point => [point.longitude, point.latitude]),
+            },
+          }}>
+            <MapboxGL.LineLayer id="routeLine" style={{ lineColor: '#d32f2f', lineWidth: 4 }} />
+          </MapboxGL.ShapeSource>
         )}
         {startLoc && (
-          <Marker coordinate={startLoc} title="نقطة البداية" pinColor="green" />
+          <MapboxGL.PointAnnotation id="start" coordinate={[startLoc.longitude, startLoc.latitude]}>
+            <View style={{ backgroundColor: 'green', borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
+          </MapboxGL.PointAnnotation>
         )}
         {endLoc && (
-          <Marker coordinate={endLoc} title="نقطة النهاية" pinColor="red" />
+          <MapboxGL.PointAnnotation id="end" coordinate={[endLoc.longitude, endLoc.latitude]}>
+            <View style={{ backgroundColor: 'red', borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
+          </MapboxGL.PointAnnotation>
         )}
-        <UrlTile
-          urlTemplate="https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maximumZ={19}
-          flipY={false}
+                    {currentLocation && (
+              <MapboxGL.UserLocation 
+                visible={true} 
+                showsUserHeadingIndicator={true}
+                onUpdate={(location) => {
+                  // Safe location update handler
+                  if (location && location.coords) {
+                    setCurrentLocation({
+                      latitude: location.coords.latitude,
+                      longitude: location.coords.longitude
+                    });
+                  }
+                }}
+              />
+            )}
+      </MapboxGL.MapView>
+      <View style={styles.bottomPanel}>
+        <Text style={styles.title}>ابدأ تتبع رحلتك</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="عدد الركاب (اختياري)"
+          keyboardType="numeric"
+          value={passengers}
+          onChangeText={setPassengers}
         />
-                      </MapView>
-        <View style={styles.bottomPanel}>
-          <Text style={styles.title}>ابدأ تتبع رحلتك</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="عدد الركاب (اختياري)"
-            keyboardType="numeric"
-            value={passengers}
-            onChangeText={setPassengers}
-          />
-          {!tracking ? (
-            <TouchableOpacity style={styles.button} onPress={startTracking}>
-              <Text style={styles.buttonText}>ابدأ التتبع</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={[styles.button, { backgroundColor: '#222' }]} onPress={endTracking}>
-              <Text style={styles.buttonText}>انهاء التتبع</Text>
-            </TouchableOpacity>
-          )}
-          {loading && (
-            <View style={{ alignItems: 'center', marginVertical: 10 }}>
-              <ActivityIndicator size="large" color="#d32f2f" />
-              <Text style={{ color: '#d32f2f', marginTop: 8 }}>جاري المعالجة...</Text>
-            </View>
-          )}
-        </View>
+        {!tracking ? (
+          <TouchableOpacity style={styles.button} onPress={startTracking}>
+            <Text style={styles.buttonText}>ابدأ التتبع</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={[styles.button, { backgroundColor: '#222' }]} onPress={endTracking}>
+            <Text style={styles.buttonText}>انهاء التتبع</Text>
+          </TouchableOpacity>
+        )}
+        {loading && (
+          <View style={{ alignItems: 'center', marginVertical: 10 }}>
+            <ActivityIndicator size="large" color="#d32f2f" />
+            <Text style={{ color: '#d32f2f', marginTop: 8 }}>جاري المعالجة...</Text>
+          </View>
+        )}
       </View>
+    </View>
   );
 }
 

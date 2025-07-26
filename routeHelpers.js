@@ -65,20 +65,17 @@ export function distillRoute(route, maxPoints = 20) {
   return result;
 }
 
-// Gets the governorate/state from coordinates using OpenStreetMap Nominatim
+const MAPBOX_TOKEN = 'pk.eyJ1IjoibWVkb3dlc3NhbSIsImEiOiJjbWRrNmNoOGMwdjV4MmpxeXRlMWRiZmF2In0.VIllyVMDcPZVM00od5u0yg';
+
+// Gets the governorate/state from coordinates using Mapbox Geocoding API
 export async function getGovernorateFromCoords(lat, lng) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`;
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&types=region&language=ar,en`;
   try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'TaxiFairApp/1.0',
-        'Accept-Language': 'ar,en'
-      }
-    });
-    if (!res.ok) throw new Error('Nominatim error');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Mapbox Geocoding error');
     const data = await res.json();
-    // Try to get governorate from address
-    const gov = data.address.state || data.address.county || data.address.region || '';
+    // Try to get governorate from features
+    const gov = data.features && data.features[0] && (data.features[0].text || data.features[0].place_name) || '';
     return gov;
   } catch (err) {
     console.error('Error fetching governorate:', err);
@@ -86,19 +83,14 @@ export async function getGovernorateFromCoords(lat, lng) {
   }
 }
 
-// Gets the full address name from coordinates using OpenStreetMap Nominatim
+// Gets the full address name from coordinates using Mapbox Geocoding API
 export async function getAddressFromCoords(lat, lng) {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1`;
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&language=ar,en`;
   try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'TaxiFairApp/1.0',
-        'Accept-Language': 'ar,en'
-      }
-    });
-    if (!res.ok) throw new Error('Nominatim error');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Mapbox Geocoding error');
     const data = await res.json();
-    return data.display_name || '';
+    return data.features && data.features[0] && data.features[0].place_name || '';
   } catch (err) {
     console.error('Error fetching address:', err);
     return '';

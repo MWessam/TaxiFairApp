@@ -1,4 +1,5 @@
-{
+import 'dotenv/config';
+export default {
   "expo": {
     "name": "TaxiFairMock",
     "slug": "TaxiFairMock",
@@ -44,7 +45,8 @@
       "router": {},
       "eas": {
         "projectId": "9f03bc33-b757-410d-90c9-1d5d4c61d73b"
-      }
+      },
+      "MAPBOX_ACCESS_TOKEN": process.env.MAPBOX_ACCESS_TOKEN
     }
   }
 }

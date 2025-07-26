@@ -150,6 +150,11 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    
+    // Exclude problematic Mapbox dependencies
+    configurations.all {
+        exclude group: 'com.mapbox.mapboxsdk', module: 'mapbox-android-accounts'
+    }
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

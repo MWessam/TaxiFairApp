@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ActivityIndicator, Platform, KeyboardAvoidingView, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapboxGL from '@rnmapbox/maps';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getRouteDistanceORS, getGovernorateFromCoords } from '../../routeHelpers';
@@ -9,6 +9,8 @@ import { saveTrip } from '../../firestoreHelpers';
 import { useTheme } from '@/constants/ThemeContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import * as Location from 'expo-location';
+
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,8 +28,10 @@ export default function TripForm({ mode = 'submit' }) {
   const [loading, setLoading] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);
   const [isScreenFocused, setIsScreenFocused] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const bottomSheetRef = useRef(null);
   const snapPoints = useMemo(() => ['40%', '90%'], []);
+  const cameraRef = useRef();
 
   const isEstimateMode = mode === 'estimate';
 
@@ -64,14 +68,15 @@ export default function TripForm({ mode = 'submit' }) {
     async function fetchRoute() {
       if (from.lat && from.lng && to.lat && to.lng) {
         try {
-          // Use getRouteDistanceORS to get route geometry
           const routeData = await getRouteDistanceORS(
             { lat: from.lat, lng: from.lng, name: from.address },
             { lat: to.lat, lng: to.lng, name: to.address },
-            true // pass true to get geometry
+            true
           );
           if (routeData && routeData.geometry && routeData.geometry.length > 0) {
-            setRouteCoords(routeData.geometry);
+            setRouteCoords(routeData.geometry.map(coord =>
+              Array.isArray(coord) ? coord : [coord.longitude, coord.latitude]
+            ));
           } else {
             setRouteCoords([]);
           }
@@ -92,6 +97,40 @@ export default function TripForm({ mode = 'submit' }) {
       bottomSheetRef.current.expand();
     }
   }, [from, to, isScreenFocused]);
+
+  useEffect(() => {
+    let isMounted = true;
+    
+    (async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted' && isMounted) {
+          let loc = await Location.getCurrentPositionAsync({});
+          console.log('Location:', loc);
+          if (isMounted) {
+            setCurrentLocation({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+          }
+        }
+      } catch (error) {
+        console.log('Location error:', error);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (cameraRef.current && getMapCenter()) {
+      cameraRef.current.setCamera({
+        centerCoordinate: getMapCenter(),
+        zoomLevel: 14,
+        animationDuration: 0,
+        animationMode: 'none',
+      });
+    }
+  }, [currentLocation, from, to]);
 
   const handleSubmit = async () => {
     // Validation based on mode
@@ -178,31 +217,22 @@ export default function TripForm({ mode = 'submit' }) {
     }
   };
 
-  // Center map between from and to
-  const getMapRegion = () => {
+  // Get map center coordinates
+  const getMapCenter = () => {
     if (from.lat && from.lng && to.lat && to.lng) {
       const midLat = (from.lat + to.lat) / 2;
       const midLng = (from.lng + to.lng) / 2;
-      return {
-        latitude: midLat,
-        longitude: midLng,
-        latitudeDelta: Math.abs(from.lat - to.lat) * 2.5 + 0.03,
-        longitudeDelta: Math.abs(from.lng - to.lng) * 2.5 + 0.03,
-      };
+      console.log('Mid:', midLat, midLng);
+      return [midLng, midLat];
     } else if (from.lat && from.lng) {
-      return {
-        latitude: from.lat,
-        longitude: from.lng,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      };
+      console.log('From:', from);
+      return [from.lng, from.lat];
+    } else if (currentLocation) {
+      console.log('Current Location:', currentLocation);
+      return [currentLocation.lng, currentLocation.lat];
     } else {
-      return {
-        latitude: 30.0444,
-        longitude: 31.2357,
-        latitudeDelta: 0.08,
-        longitudeDelta: 0.08,
-      };
+      console.log('Default:', [31.2357, 30.0444]);
+      return [31.2357, 30.0444];
     }
   };
 
@@ -234,22 +264,49 @@ export default function TripForm({ mode = 'submit' }) {
   if (!isScreenFocused) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.background }}>
-        <MapView
-          style={StyleSheet.absoluteFill}
-          initialRegion={getMapRegion()}
-          region={getMapRegion()}
-          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        >
+        <MapboxGL.MapView style={StyleSheet.absoluteFill}>
+          <MapboxGL.Camera
+            zoomLevel={14}
+            centerCoordinate={getMapCenter()}
+            animationEnabled={false}
+          />
           {from.lat && from.lng && (
-            <Marker coordinate={{ latitude: from.lat, longitude: from.lng }} title={from.address || 'من'} pinColor={theme.primary} />
+            <MapboxGL.PointAnnotation id="from" coordinate={[from.lng, from.lat]}>
+              <View style={{ backgroundColor: theme.primary, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
+            </MapboxGL.PointAnnotation>
           )}
           {to.lat && to.lng && (
-            <Marker coordinate={{ latitude: to.lat, longitude: to.lng }} title={to.address || 'إلى'} pinColor={theme.accent} />
+            <MapboxGL.PointAnnotation id="to" coordinate={[to.lng, to.lat]}>
+              <View style={{ backgroundColor: theme.accent, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
+            </MapboxGL.PointAnnotation>
           )}
           {routeCoords.length > 0 && (
-            <Polyline coordinates={routeCoords} strokeColor={theme.primary} strokeWidth={4} />
+            <MapboxGL.ShapeSource id="routeSource" shape={{
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: routeCoords,
+              },
+            }}>
+              <MapboxGL.LineLayer id="routeLine" style={{ lineColor: theme.primary, lineWidth: 4 }} />
+            </MapboxGL.ShapeSource>
           )}
-        </MapView>
+          {currentLocation && (
+            <MapboxGL.UserLocation 
+              visible={true} 
+              showsUserHeadingIndicator={true}
+              onUpdate={(location) => {
+                // Safe location update handler
+                if (location && location.coords) {
+                  setCurrentLocation({
+                    lat: location.coords.latitude,
+                    lng: location.coords.longitude
+                  });
+                }
+              }}
+            />
+          )}
+        </MapboxGL.MapView>
       </View>
     );
   }
@@ -258,22 +315,45 @@ export default function TripForm({ mode = 'submit' }) {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>
         <View style={{ flex: 1, backgroundColor: theme.background }}>
-          <MapView
-            style={StyleSheet.absoluteFill}
-            initialRegion={getMapRegion()}
-            region={getMapRegion()}
-            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-          >
+          <MapboxGL.MapView style={StyleSheet.absoluteFill}>
+            <MapboxGL.Camera ref={cameraRef} />
             {from.lat && from.lng && (
-              <Marker coordinate={{ latitude: from.lat, longitude: from.lng }} title={from.address || 'من'} pinColor={theme.primary} />
+              <MapboxGL.PointAnnotation id="from" coordinate={[from.lng, from.lat]}>
+                <View style={{ backgroundColor: theme.primary, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
+              </MapboxGL.PointAnnotation>
             )}
             {to.lat && to.lng && (
-              <Marker coordinate={{ latitude: to.lat, longitude: to.lng }} title={to.address || 'إلى'} pinColor={theme.accent} />
+              <MapboxGL.PointAnnotation id="to" coordinate={[to.lng, to.lat]}>
+                <View style={{ backgroundColor: theme.accent, borderRadius: 10, width: 20, height: 20, borderWidth: 2, borderColor: '#fff' }} />
+              </MapboxGL.PointAnnotation>
             )}
             {routeCoords.length > 0 && (
-              <Polyline coordinates={routeCoords} strokeColor={theme.primary} strokeWidth={4} />
+              <MapboxGL.ShapeSource id="routeSource" shape={{
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: routeCoords,
+                },
+              }}>
+                <MapboxGL.LineLayer id="routeLine" style={{ lineColor: theme.primary, lineWidth: 4 }} />
+              </MapboxGL.ShapeSource>
             )}
-          </MapView>
+            {currentLocation && (
+              <MapboxGL.UserLocation 
+                visible={true} 
+                showsUserHeadingIndicator={true}
+                onUpdate={(location) => {
+                  // Safe location update handler
+                  if (location && location.coords) {
+                    setCurrentLocation({
+                      lat: location.coords.latitude,
+                      lng: location.coords.longitude
+                    });
+                  }
+                }}
+              />
+            )}
+          </MapboxGL.MapView>
           <BottomSheet
             ref={bottomSheetRef}
             index={0}
