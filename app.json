@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "taxifairmock",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
@@ -34,7 +34,9 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-location",
+      "react-native-maps"
     ],
     "experiments": {
       "typedRoutes": true

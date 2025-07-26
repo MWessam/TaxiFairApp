@@ -1,4 +1,4 @@
-import TripForm from '../(tabs)/SubmitTrip';
+import TripForm from '../(tabs)/SubmitTrip.js';
 
 export default function EstimateFare() {
   return <TripForm mode="estimate" />;

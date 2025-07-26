@@ -181,6 +181,11 @@ exports.submitTrip = onCall(async (request) => {
 exports.analyzeSimilarTrips = onCall(async (request) => {
   const { data } = request;
   const context = request.auth;
+  
+  console.log('=== analyzeSimilarTrips DEBUG START ===');
+  console.log('Request data:', JSON.stringify(data, null, 2));
+  console.log('Context:', context ? 'Authenticated' : 'Unauthenticated');
+  
   try {
     // For now, allow unauthenticated requests (you can enable auth later)
     // if (!context) {
@@ -200,16 +205,24 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
       maxDistanceDiff = 2
     } = data;
 
+    console.log('Extracted parameters:', {
+      fromLat, fromLng, toLat, toLng, distance, startTime, governorate,
+      maxDistance, maxTimeDiff, maxDistanceDiff
+    });
+
     // Validate input parameters
     if (!distance || distance <= 0 || distance > 100) {
+      console.log('Distance validation failed:', { distance });
       throw new Error('Invalid distance parameter');
     }
     
     if (fromLat && (fromLat < 22 || fromLat > 32)) {
+      console.log('Start latitude validation failed:', { fromLat });
       throw new Error('Invalid start latitude');
     }
     
     if (toLat && (toLat < 22 || toLat > 32)) {
+      console.log('End latitude validation failed:', { toLat });
       throw new Error('Invalid end latitude');
     }
 
@@ -221,9 +234,24 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
     const timeRangeEnd = new Date(startDate);
     timeRangeEnd.setHours(hour + maxTimeDiff, 59, 59, 999);
 
+    console.log('Time calculations:', {
+      startTime,
+      startDate: startDate.toISOString(),
+      hour,
+      timeRangeStart: timeRangeStart.toISOString(),
+      timeRangeEnd: timeRangeEnd.toISOString()
+    });
+
     // Calculate distance range
     const distanceRangeStart = Math.max(0, distance - maxDistanceDiff);
     const distanceRangeEnd = distance + maxDistanceDiff;
+
+    console.log('Distance range calculations:', {
+      distance,
+      maxDistanceDiff,
+      distanceRangeStart,
+      distanceRangeEnd
+    });
 
     // Query for similar trips (server-side only)
     let tripsQuery = db.collection('trips')
@@ -231,14 +259,24 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
       .where('distance', '<=', distanceRangeEnd)
       .where('fare', '>', 0);
 
+    console.log('Base query created with filters:', {
+      distanceRangeStart,
+      distanceRangeEnd,
+      fareFilter: '> 0'
+    });
+
     // If governorate is available, filter by it
     if (governorate) {
       tripsQuery = tripsQuery.where('governorate', '==', governorate);
+      console.log('Added governorate filter:', governorate);
     }
 
+    console.log('Executing Firestore query...');
     const snapshot = await tripsQuery.limit(100).get();
+    console.log('Query executed. Results count:', snapshot.size);
 
     if (snapshot.empty) {
+      console.log('No trips found in query results');
       return {
         success: true,
         data: {
@@ -254,6 +292,8 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
       };
     }
 
+    console.log('Processing', snapshot.size, 'trips from query results');
+    
     const trips = [];
     snapshot.forEach(doc => {
       const trip = doc.data();
@@ -262,19 +302,62 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
         ...trip
       });
     });
+    
+    console.log('Sample trip data (first 2):', trips.slice(0, 2).map(trip => ({
+      id: trip.id,
+      distance: trip.distance,
+      fare: trip.fare,
+      from: trip.from,
+      to: trip.to,
+      start_time: trip.start_time
+    })));
 
     // Filter by geographic proximity (if coordinates are provided)
     let filteredTrips = trips;
     if (fromLat && fromLng && toLat && toLng) {
+      console.log('Filtering by geographic proximity with coordinates:', {
+        fromLat, fromLng, toLat, toLng, maxDistance
+      });
+      
+      const originalCount = trips.length;
       filteredTrips = trips.filter(trip => {
+        if (!trip.from?.lat || !trip.from?.lng || !trip.to?.lat || !trip.to?.lng) {
+          console.log('Trip missing coordinates:', trip.id);
+          return false;
+        }
+        
         const fromDistance = calculateDistance(fromLat, fromLng, trip.from.lat, trip.from.lng);
         const toDistance = calculateDistance(toLat, toLng, trip.to.lat, trip.to.lng);
-        return fromDistance <= maxDistance && toDistance <= maxDistance;
+        const isWithinRange = fromDistance <= maxDistance && toDistance <= maxDistance;
+        
+        if (!isWithinRange) {
+          console.log('Trip outside geographic range:', {
+            tripId: trip.id,
+            fromDistance: Math.round(fromDistance * 100) / 100,
+            toDistance: Math.round(toDistance * 100) / 100,
+            maxDistance
+          });
+        }
+        
+        return isWithinRange;
       });
+      
+      console.log('Geographic filtering results:', {
+        originalCount,
+        filteredCount: filteredTrips.length,
+        removedCount: originalCount - filteredTrips.length
+      });
+    } else {
+      console.log('No geographic filtering applied - missing coordinates');
     }
 
+    console.log('Final trips count for analysis:', filteredTrips.length);
+    
     // Calculate statistics (same logic as before)
     const analysis = calculateTripStatistics(filteredTrips);
+    
+    console.log('Analysis completed successfully');
+    console.log('=== analyzeSimilarTrips DEBUG END ===');
     
     return {
       success: true,
@@ -282,7 +365,10 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
     };
 
   } catch (error) {
+    console.error('=== analyzeSimilarTrips ERROR ===');
     console.error('Error analyzing similar trips:', error);
+    console.error('Error stack:', error.stack);
+    console.error('=== analyzeSimilarTrips ERROR END ===');
     return {
       success: false,
       error: error.message
@@ -305,7 +391,11 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
 
 // Calculate trip statistics (same as before)
 function calculateTripStatistics(trips) {
+  console.log('=== calculateTripStatistics DEBUG START ===');
+  console.log('Processing', trips.length, 'trips for statistics');
+  
   if (trips.length === 0) {
+    console.log('No trips to analyze, returning empty statistics');
     return {
       similarTripsCount: 0,
       averageFare: 0,
@@ -320,11 +410,19 @@ function calculateTripStatistics(trips) {
 
   // Calculate basic statistics
   const fares = trips.map(trip => trip.fare).filter(fare => fare > 0);
+  console.log('Fare statistics:', {
+    totalTrips: trips.length,
+    tripsWithValidFares: fares.length,
+    fareRange: fares.length > 0 ? { min: Math.min(...fares), max: Math.max(...fares) } : 'No valid fares'
+  });
+  
   const averageFare = fares.length > 0 ? fares.reduce((a, b) => a + b, 0) / fares.length : 0;
   const fareRange = {
-    min: Math.min(...fares),
-    max: Math.max(...fares)
+    min: fares.length > 0 ? Math.min(...fares) : 0,
+    max: fares.length > 0 ? Math.max(...fares) : 0
   };
+  
+  console.log('Calculated fare statistics:', { averageFare, fareRange });
 
   // Group by time periods
   const timeGroups = {
@@ -345,8 +443,10 @@ function calculateTripStatistics(trips) {
     saturday: { count: 0, total: 0, avg: 0 }
   };
 
+  let tripsWithStartTime = 0;
   trips.forEach(trip => {
     if (trip.start_time) {
+      tripsWithStartTime++;
       const tripDate = new Date(trip.start_time);
       const tripHour = tripDate.getHours();
       const dayOfWeek = tripDate.getDay();
@@ -372,6 +472,12 @@ function calculateTripStatistics(trips) {
       dayGroups[dayName].count++;
       dayGroups[dayName].total += trip.fare;
     }
+  });
+  
+  console.log('Time-based grouping:', {
+    tripsWithStartTime,
+    tripsWithoutStartTime: trips.length - tripsWithStartTime,
+    timeGroups
   });
 
   // Calculate averages
@@ -418,18 +524,22 @@ function calculateTripStatistics(trips) {
 
   // Get recent trips (anonymized)
   const recentTrips = trips
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .sort((a, b) => {
+      const dateA = a.created_at || a.submitted_at || new Date(0);
+      const dateB = b.created_at || b.submitted_at || new Date(0);
+      return new Date(dateB) - new Date(dateA);
+    })
     .slice(0, 10)
     .map(trip => ({
       fare: trip.fare,
       distance: trip.distance,
       duration: trip.duration,
       startTime: trip.start_time,
-      from: trip.from.governorate || 'غير محدد',
-      to: trip.to.governorate || 'غير محدد'
+      from: trip.from?.governorate || 'غير محدد',
+      to: trip.to?.governorate || 'غير محدد'
     }));
 
-  return {
+  const result = {
     similarTripsCount: trips.length,
     averageFare: Math.round(averageFare * 100) / 100,
     fareRange,
@@ -439,6 +549,15 @@ function calculateTripStatistics(trips) {
     fareDistribution,
     recentTrips
   };
+  
+  console.log('Final analysis result:', {
+    similarTripsCount: result.similarTripsCount,
+    averageFare: result.averageFare,
+    recentTripsCount: result.recentTrips.length
+  });
+  console.log('=== calculateTripStatistics DEBUG END ===');
+  
+  return result;
 }
 
 // Helper function to create fare distribution
