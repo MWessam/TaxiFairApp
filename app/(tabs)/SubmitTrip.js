@@ -238,6 +238,7 @@ export default function TripForm({ mode = 'submit' }) {
           style={StyleSheet.absoluteFill}
           initialRegion={getMapRegion()}
           region={getMapRegion()}
+          urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         >
           {from.lat && from.lng && (
             <Marker coordinate={{ latitude: from.lat, longitude: from.lng }} title={from.address || 'من'} pinColor={theme.primary} />
@@ -261,6 +262,7 @@ export default function TripForm({ mode = 'submit' }) {
             style={StyleSheet.absoluteFill}
             initialRegion={getMapRegion()}
             region={getMapRegion()}
+            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           >
             {from.lat && from.lng && (
               <Marker coordinate={{ latitude: from.lat, longitude: from.lng }} title={from.address || 'من'} pinColor={theme.primary} />
