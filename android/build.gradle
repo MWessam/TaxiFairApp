@@ -30,16 +30,13 @@ allprojects {
     google()
     mavenCentral()
     maven { url 'https://www.jitpack.io' }
-    maven {
-      url 'https://api.mapbox.com/downloads/v2/releases/maven'
-      authentication {
-        basic(BasicAuthentication)
-      }
-      credentials {
-        username = 'mapbox'
-        password = 'sk.eyJ1IjoibWVkb3dlc3NhbSIsImEiOiJjbWRrN3VucjYwdnNwMmpwa2h2YWdjbmVzIn0.whHZOWfqFypBcQc3Z6EYsA'
-      }
-    }
+    maven { 
+     url 'https://api.mapbox.com/downloads/v2/releases/maven'
+     credentials {
+       username = 'mapbox'
+       password = project.hasProperty('MAPBOX_DOWNLOADS_TOKEN') ? project.property('MAPBOX_DOWNLOADS_TOKEN') : System.getenv('MAPBOX_DOWNLOADS_TOKEN')
+     }
+   }
   }
 }
 
