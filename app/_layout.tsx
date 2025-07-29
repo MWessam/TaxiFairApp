@@ -12,6 +12,7 @@ import { FavoritesProvider } from '@/constants/FavoritesContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { setupNotificationHandler, getPendingFareResults } from '../services/backgroundTracking';
 import locationService from '../services/locationService';
+import adService from '../services/adService';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -20,10 +21,11 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  // Setup notification handler and initialize location service
+  // Setup notification handler and initialize services
   useEffect(() => {
     setupNotificationHandler();
     locationService.initialize();
+    adService.initialize(); // Initialize ad service
     
     // Check for pending fare results from notification
     const checkPendingResults = async () => {

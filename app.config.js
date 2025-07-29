@@ -3,7 +3,7 @@ export default {
   "expo": {
     "name": "TaxiFairMock",
     "slug": "TaxiFairMock",
-    "version": "1.0.1",
+    "version": "1.0.14",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "taxifairmock",
@@ -31,7 +31,7 @@ export default {
       },
       "edgeToEdgeEnabled": true,
       "package": "com.MedoWessam.TaxiOgraApp",
-      "versionCode": 11,
+      "versionCode": 24,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",

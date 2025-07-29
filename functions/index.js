@@ -2,6 +2,21 @@ const { onCall } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const { tripSchema } = require('./schema');
+// Lazy load zone manager
+let zoneManager;
+
+function getZoneManager() {
+  if (!zoneManager) {
+    zoneManager = require('./zone-manager');
+  }
+  return zoneManager;
+}
+
+// Vertex AI will be loaded when needed
+function getVertexAIClient() {
+  // For now, return null since we're not using Vertex AI yet
+  return null;
+}
 
 admin.initializeApp();
 
@@ -10,6 +25,61 @@ const db = admin.firestore();
 // Bot protection and rate limiting (Firestore-backed)
 const MAX_SUBMISSIONS_PER_HOUR = 5;
 const MAX_SUBMISSIONS_PER_DAY = 50;
+
+// Zone management is now handled by zone-manager.js
+
+// Egyptian holidays (you can expand this)
+const EGYPTIAN_HOLIDAYS = [
+  '2024-01-07', // Coptic Christmas
+  '2024-04-10', // Eid al-Fitr (approximate)
+  '2024-06-17', // Eid al-Adha (approximate)
+  '2024-07-23', // Revolution Day
+  '2024-09-27', // Prophet's Birthday (approximate)
+  '2024-10-06', // Armed Forces Day
+  // Add more holidays as needed
+];
+
+// Tariff validation constants
+const TARIFF_CONFIG = {
+  BASE_FARE: 9, // Base fare in EGP
+  PER_KM_RATE: 2, // Rate per kilometer in EGP
+  MIN_PERCENTAGE_MODIFIER: 0.15, // 15% minimum
+  MAX_PERCENTAGE_MODIFIER: 0.60, // 60% maximum
+  ESTIMATE_PERCENTAGE_MODIFIER: 0.40, // 40% for estimate
+  OUTLIER_MULTIPLIER: 1.5, // For IQR outlier detection
+};
+
+// Zone determination is now handled by zone-manager.js
+
+// Function to extract ML features from trip data
+function extractMLFeatures(tripData) {
+  const features = {};
+  
+  // Extract time features
+  if (tripData.start_time) {
+    const startDate = new Date(tripData.start_time);
+    features.time_of_day = startDate.getHours(); // 0-23
+    features.day_of_week = startDate.getDay(); // 0=Sunday, 6=Saturday
+    features.date = startDate.toISOString().split('T')[0]; // YYYY-MM-DD
+    features.month = startDate.getMonth() + 1; // 1-12 (getMonth() returns 0-11)
+    features.day_of_month = startDate.getDate(); // 1-31
+  }
+  
+  // Extract speed feature
+  if (tripData.distance && tripData.duration) {
+    features.speed_kmh = (tripData.distance / tripData.duration) * 60;
+  }
+  
+  // Extract zone features
+  if (tripData.from?.lat && tripData.from?.lng) {
+    features.from_zone = getZoneManager().getZoneFromCoordinates(tripData.from.lat, tripData.from.lng);
+  }
+  if (tripData.to?.lat && tripData.to?.lng) {
+    features.to_zone = getZoneManager().getZoneFromCoordinates(tripData.to.lat, tripData.to.lng);
+  }
+  
+  return features;
+}
 
 // Validate trip data feasibility
 function validateTripFeasibility(tripData) {
@@ -48,18 +118,19 @@ function validateTripFeasibility(tripData) {
     }
   }
   
-  // Location validation
+  // Location validation - Updated for Mansoura specifically
   if (tripData.from && tripData.from.lat && tripData.from.lng) {
-    if (tripData.from.lat < 22 || tripData.from.lat > 32 || 
-        tripData.from.lng < 25 || tripData.from.lng > 37) {
-      errors.push('Start location seems outside Egypt');
+    // Mansoura coordinates roughly: lat 31.04, lng 31.37
+    if (tripData.from.lat < 30.9 || tripData.from.lat > 31.2 || 
+        tripData.from.lng < 31.3 || tripData.from.lng > 31.5) {
+      errors.push('Start location seems outside Mansoura area');
     }
   }
   
   if (tripData.to && tripData.to.lat && tripData.to.lng) {
-    if (tripData.to.lat < 22 || tripData.to.lat > 32 || 
-        tripData.to.lng < 25 || tripData.to.lng > 37) {
-      errors.push('End location seems outside Egypt');
+    if (tripData.to.lat < 30.9 || tripData.to.lat > 31.2 || 
+        tripData.to.lng < 31.3 || tripData.to.lng > 31.5) {
+      errors.push('End location seems outside Mansoura area');
     }
   }
   
@@ -84,18 +155,6 @@ function validateTripFeasibility(tripData) {
       errors.push('Fare per kilometer seems too low (<0.5 EGP/km)');
     }
   }
-  
-//   // Time validation
-//   if (tripData.start_time) {
-//     const startTime = new Date(tripData.start_time);
-//     const now = new Date();
-//     if (startTime > now) {
-//       errors.push('Start time cannot be in the future');
-//     }
-//     if (startTime < new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)) { // 7 days ago
-//       errors.push('Start time cannot be more than 7 days ago');
-//     }
-//   }
   
   return errors;
 }
@@ -150,14 +209,20 @@ async function checkRateLimit(identifier) {
 }
 
 // Secure trip submission with validation
-exports.submitTrip = onCall({}, async (request) => {
+exports.submitTrip = onCall({
+  memory: '512MiB',
+  timeoutSeconds: 60
+}, async (request) => {
   const { data } = request;
   const context = request.auth;
   try {
     // No user authentication required – function protected by rate limiting only.
     
     // Rate limiting based on IP address for now
-    const identifier = context ? context.uid : request.ip;
+    const identifier = context ? context.uid : (request.ip || 'unknown');
+    if (!identifier || identifier.trim() === '') {
+      throw new Error('Unable to identify user for rate limiting');
+    }
     await checkRateLimit(identifier);
     
     // Validate trip data using Zod schema
@@ -167,9 +232,13 @@ exports.submitTrip = onCall({}, async (request) => {
       throw new Error(`Validation failed: ${errors.join(', ')}`);
     }
     
-    // Add metadata
+    // Extract ML features from the trip data
+    const mlFeatures = extractMLFeatures(data);
+    
+    // Add metadata and ML features
     const tripData = {
       ...data,
+      ...mlFeatures, // Include all ML features
       user_id: context ? context.uid : 'anonymous',
       submitted_at: admin.firestore.FieldValue.serverTimestamp(),
       ip_address: hashIp(request.ip),
@@ -182,7 +251,8 @@ exports.submitTrip = onCall({}, async (request) => {
     return {
       success: true,
       trip_id: docRef.id,
-      message: 'Trip submitted successfully'
+      message: 'Trip submitted successfully',
+      ml_features: mlFeatures // Return ML features for debugging
     };
     
   } catch (error) {
@@ -195,7 +265,10 @@ exports.submitTrip = onCall({}, async (request) => {
 });
 
 // Secure trip analysis (no direct data access)
-exports.analyzeSimilarTrips = onCall({}, async (request) => {
+exports.analyzeSimilarTrips = onCall({
+  memory: '512MiB',
+  timeoutSeconds: 60
+}, async (request) => {
   const { data } = request;
   const context = request.auth;
   
@@ -315,7 +388,15 @@ exports.analyzeSimilarTrips = onCall({}, async (request) => {
       console.log('Query executed. Results count:', snapshot.size);
     }
     // Estimate fare via google vertex ai ml model
-    // const estimatedFare = await estimateFare(snapshot.docs.map(doc => doc.data()));
+    const estimatedFare = await estimateFare(snapshot.docs.map(doc => doc.data()), {
+      distance,
+      fromLat,
+      fromLng,
+      toLat,
+      toLng,
+      startTime,
+      governorate
+    });
 
     if (snapshot.empty) {
       if (process.env.DEBUG_LOGS === 'true') {
@@ -461,19 +542,48 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
-async function estimateFare(trips) {
-  // TODO: Implement ML model for fare estimation
-  // For now, return a simple average
+// Only essential functions - no zone management needed
+
+// Only essential functions - no testing needed
+
+async function estimateFare(trips, requestData = null) {
   if (!trips || trips.length === 0) {
     return 0;
   }
   
-  const fares = trips.map(trip => trip.fare).filter(fare => fare > 0);
-  if (fares.length === 0) {
+  try {
+    // If we have request data, use it for prediction
+    if (requestData) {
+      // Extract ML features from the request data
+      const mlFeatures = extractMLFeatures(requestData);
+      
+      // Make prediction using Vertex AI (disabled for now)
+      // const predictedFare = await getVertexAIClient().predictFare({
+      //   ...requestData,
+      //   ...mlFeatures
+      // });
+      const predictedFare = 0; // Return 0 until Vertex AI is ready
+      
+      return predictedFare;
+    }
+    
+    // Otherwise, use the most recent trip as reference
+    const latestTrip = trips[0]; // Assuming trips are sorted by date
+    const mlFeatures = extractMLFeatures(latestTrip);
+    
+    // const predictedFare = await getVertexAIClient().predictFare({
+    //   ...latestTrip,
+    //   ...mlFeatures
+    // });
+    const predictedFare = 0; // Return 0 until Vertex AI is ready
+    
+    return predictedFare;
+    
+  } catch (error) {
+    console.error('Error making Vertex AI prediction:', error);
+    // Fallback to 0 if Vertex AI fails
     return 0;
   }
-  
-  return fares.reduce((a, b) => a + b, 0) / fares.length;
 }
 
 // Calculate trip statistics (same as before)
@@ -637,6 +747,7 @@ function calculateTripStatistics(trips) {
       from: trip.from?.governorate || 'غير محدد',
       to: trip.to?.governorate || 'غير محدد'
     }));
+    
 
   const result = {
     similarTripsCount: trips.length,
@@ -689,6 +800,8 @@ function createFareDistribution(fares) {
     percentage: Math.round((count / fares.length) * 100)
   }));
 } 
+
+// Only essential functions - no export needed
 
 function hashIp(ip) {
   if (!ip) return 'unknown';

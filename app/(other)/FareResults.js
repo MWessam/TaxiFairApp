@@ -5,6 +5,7 @@ import { saveTrip, analyzeSimilarTrips } from '../../firestoreHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/constants/ThemeContext';
 import { useFavorites } from '@/constants/FavoritesContext';
+import adService from '../../services/adService';
 
 export default function FareResults() {
   const params = useLocalSearchParams();
@@ -303,7 +304,14 @@ export default function FareResults() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.push('/')}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={async () => {
+              // Show ad when user tries to go back from results
+              await adService.showAdWhenGoingBackFromResults();
+              router.push('/');
+            }}
+          >
             <Ionicons name="arrow-forward" size={20} color={theme.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>نتائج الرحلة</Text>

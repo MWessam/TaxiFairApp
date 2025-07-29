@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 
 class LocationService {
   constructor() {
@@ -64,6 +64,22 @@ class LocationService {
       this.locationStatus = 'requesting';
       this.notifyListeners();
 
+      // First check if location services are enabled
+      const isEnabled = await Location.hasServicesEnabledAsync();
+      if (!isEnabled) {
+        Alert.alert(
+          'Location Services Disabled',
+          'Please enable location services in your device settings to use this app.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() }
+          ]
+        );
+        this.locationStatus = 'denied';
+        this.notifyListeners();
+        return null;
+      }
+
       // Request precise location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       console.log('Permission request result:', status);
@@ -90,9 +106,21 @@ class LocationService {
         this.locationStatus = 'denied';
         this.notifyListeners();
         
+        // More specific error message for different scenarios
+        let message = 'This app needs precise location access to accurately track your taxi rides.';
+        let title = 'Location Permission Required';
+        
+        if (status === 'denied') {
+          title = 'Permission Denied';
+          message = 'Location permission was denied. Please enable it in settings to use this app.';
+        } else if (status === 'undetermined') {
+          title = 'Permission Not Determined';
+          message = 'Please grant location permission to use this app.';
+        }
+        
         Alert.alert(
-          'Precise Location Required',
-          'This app needs precise location access to accurately track your taxi rides. Please enable precise location permissions in settings.',
+          title,
+          message,
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => Linking.openSettings() }
@@ -105,7 +133,17 @@ class LocationService {
       this.notifyListeners();
       
       console.error('Error requesting location permission:', error);
-      Alert.alert('Error', 'Failed to get precise location. Please check your location settings.');
+      
+      // Handle specific error cases
+      let errorMessage = 'Failed to get location. Please check your location settings.';
+      
+      if (error.code === 'LOCATION_UNAVAILABLE') {
+        errorMessage = 'Location is currently unavailable. Please try again.';
+      } else if (error.code === 'LOCATION_TIMEOUT') {
+        errorMessage = 'Location request timed out. Please try again.';
+      }
+      
+      Alert.alert('Location Error', errorMessage);
       return null;
     }
   }

@@ -92,8 +92,8 @@ android {
         applicationId 'com.MedoWessam.TaxiOgraApp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode findProperty('versionCode')?.toInteger() ?: 22
+        versionName findProperty('versionName') ?: "1.0.12"
     }
     signingConfigs {
         debug {
@@ -102,22 +102,27 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file('../../credentials/android-keystore.jks')
+            storePassword 'android'
+            keyAlias 'android-key-alias'
+            keyPassword 'android'
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Use release signing configuration for production builds
+            signingConfig signingConfigs.release
             // shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             // minifyEnabled enableProguardInReleaseBuilds
             // proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
             
-            shrinkResources true          // ⬅️ removes unused resources (images, etc.)
-            minifyEnabled true            // ⬅️ enables R8/ProGuard
+            shrinkResources false         // ⬅️ disabled for testing
+            minifyEnabled false           // ⬅️ disabled for testing
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
                           'proguard-rules.pro'
         }

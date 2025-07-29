@@ -7,6 +7,7 @@ import { getRouteDistanceORS, getGovernorateFromCoords } from '../../routeHelper
 import { saveTrip } from '../../firestoreHelpers';
 import { useTheme } from '@/constants/ThemeContext';
 import locationService from '../../services/locationService';
+import adService from '../../services/adService';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
@@ -189,6 +190,11 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
       }
       
       setLoading(false);
+      
+      // Show ad after trip estimation (not tracking)
+      if (isEstimateMode) {
+        await adService.showAdAfterTripEstimation();
+      }
       
       // Navigate to FareResults with appropriate data
       router.push({

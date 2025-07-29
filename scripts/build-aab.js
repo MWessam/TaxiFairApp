@@ -2,6 +2,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { updateVersion } = require('./version.js');
+const { syncVersion } = require('./sync-version.js');
 
 async function buildAAB(versionType = 'patch', skipVersionUpdate = false, forceClean = false, runPrebuild = false) {
   console.log('🚀 Starting Android App Bundle build...');
@@ -14,6 +15,10 @@ async function buildAAB(versionType = 'patch', skipVersionUpdate = false, forceC
       versionInfo = updateVersion(versionType);
     }
     
+    // Step 1.5: Sync version to gradle.properties
+    console.log('🔄 Syncing version to gradle.properties...');
+    syncVersion();
+    
     // Step 2: Prebuild (ensure native dependencies are linked)
     if (runPrebuild) {
       console.log('🔧 Running prebuild...');
@@ -24,14 +29,16 @@ async function buildAAB(versionType = 'patch', skipVersionUpdate = false, forceC
     // Step 3: Clean if forced (optional)
     if (forceClean) {
       console.log('🧹 Force cleaning previous builds...');
-      execSync('cd android', { stdio: 'inherit' });
-      execSync('./gradlew clean', { stdio: 'inherit' });
+      process.chdir(path.join(__dirname, '../android'));
+      execSync('gradlew clean', { stdio: 'inherit' });
+      process.chdir(path.join(__dirname, '..'));
     }
     
     // Step 4: Build the AAB
     console.log('🔨 Building Android App Bundle...');
-    execSync('cd android', { stdio: 'inherit' });
-    execSync('./gradlew bundleRelease', { stdio: 'inherit' });
+    process.chdir(path.join(__dirname, '../android'));
+    execSync('gradlew bundleRelease', { stdio: 'inherit' });
+    process.chdir(path.join(__dirname, '..'));
     
     // Step 4: Check if build was successful
     const aabPath = path.join(__dirname, '../android/app/build/outputs/bundle/release/app-release.aab');

@@ -8,6 +8,9 @@ import { getAvailableGovernorates } from '@/constants/Colors';
 import { configureMapbox } from '@/mapboxProvider';
 import LocationPermissionRequest from '../../components/LocationPermissionRequest';
 import locationService from '../../services/locationService';
+import BannerAdComponent from '../../components/BannerAdComponent';
+import PremiumUpgradeModal from '../../components/PremiumUpgradeModal';
+import adService from '../../services/adService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -15,6 +18,7 @@ export default function Home() {
   const router = useRouter();
   const { theme, currentGovernorate, changeGovernorate } = useTheme();
   const [showGovernorateModal, setShowGovernorateModal] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [isRouterReady, setIsRouterReady] = useState(false);
   const routerRef = useRef(router);
   const availableGovernorates = getAvailableGovernorates();
@@ -178,7 +182,22 @@ export default function Home() {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>ساعد في تحسين أسعار التاكسي في مصر</Text>
+            
+            {/* Premium Upgrade Button */}
+            {adService.shouldShowAds() && (
+              <TouchableOpacity
+                style={styles.premiumButton}
+                onPress={() => setShowPremiumModal(true)}
+              >
+                <Text style={styles.premiumButtonText}>إزالة الإعلانات</Text>
+              </TouchableOpacity>
+            )}
           </View>
+        </View>
+      </ScrollView>
+
+      {/* Banner Ad */}
+      <BannerAdComponent containerStyle={styles.bannerAdContainer} />
         </View>
       </ScrollView>
 
@@ -230,6 +249,12 @@ export default function Home() {
           </View>
         </View>
       </Modal>
+
+      {/* Premium Upgrade Modal */}
+      <PremiumUpgradeModal
+        visible={showPremiumModal}
+        onClose={() => setShowPremiumModal(false)}
+      />
     </View>
   );
 }
@@ -466,5 +491,27 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: 18,
     color: '#5C2633',
     fontWeight: 'bold',
+  },
+  premiumButton: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FFD700',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FFA500',
+  },
+  premiumButtonText: {
+    fontSize: 14,
+    color: '#8B4513',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  bannerAdContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
   },
 }); 

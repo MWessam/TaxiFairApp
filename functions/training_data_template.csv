@@ -1,0 +1,11 @@
+fare,distance,duration,passenger_count,time_of_day,day_of_week,date,month,day_of_month,speed_kmh,from_zone,to_zone
+50,10.5,25,2,14,2,2024-01-15,1,15,25.2,qanat_al_suez,mohafza
+75,15.2,35,1,8,1,2024-01-16,1,16,26.1,mohafza,toreil
+45,8.3,20,3,18,3,2024-01-17,1,17,24.9,toreil,olongeel
+60,12.1,28,2,12,4,2024-01-18,1,18,25.9,olongeel,gedila
+80,18.7,42,1,7,5,2024-01-19,1,19,26.7,gedila,mashaya_tayeba
+35,6.8,16,2,20,6,2024-01-20,1,20,25.5,mashaya_tayeba,mashayah_al_sherera
+55,11.4,27,1,9,0,2024-01-21,1,21,25.3,mashayah_al_sherera,hay_el_gamaa
+70,14.6,33,3,15,1,2024-01-22,1,22,26.5,hay_el_gamaa,abdelsalam_aref
+40,7.9,19,2,17,2,2024-01-23,1,23,24.9,abdelsalam_aref,geish_street
+65,13.2,31,1,11,3,2024-01-24,1,24,25.5,geish_street,qanat_al_suez 
