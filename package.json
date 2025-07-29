@@ -8,7 +8,21 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "version:patch": "node ./scripts/version.js patch",
+    "version:minor": "node ./scripts/version.js minor",
+    "version:major": "node ./scripts/version.js major",
+    "version:set": "node ./scripts/version.js set",
+    "build:android": "cd android && ./gradlew bundleRelease",
+    "build:android-debug": "cd android && ./gradlew assembleDebug",
+    "build:android-release": "npm run version:patch && cd android && ./gradlew bundleRelease",
+    "build:aab": "node ./scripts/build-aab.js",
+    "build:aab:patch": "node ./scripts/build-aab.js patch",
+    "build:aab:minor": "node ./scripts/build-aab.js minor",
+    "build:aab:major": "node ./scripts/build-aab.js major",
+    "build:aab:prebuild": "node ./scripts/build-aab.js patch --prebuild",
+    "build:aab:clean": "node ./scripts/build-aab.js patch --force-clean",
+    "build:aab:full": "node ./scripts/build-aab.js patch --prebuild --force-clean"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",

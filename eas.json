@@ -18,7 +18,18 @@
     },
     "production": {
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease",
+        "env": {
+          "MAPBOX_DOWNLOADS_TOKEN": "sk.eyJ1IjoibWVkb3dlc3NhbSIsImEiOiJjbWRrd3ZlNG8wemIzMmpyem83aXJqczQxIn0.nSQC-IHcUe1ER3kHjYacQg"
+        }
+      },
+      "hooks": {
+        "preBuild": "./eas-hooks/pre-build.js",
+        "postBuild": "./eas-hooks/post-build.js"
+      },
+      "cache": {
+        "key": "android-gradle-{{ platform }}-{{ hashFiles('**/build.gradle', '**/gradle.properties', '**/gradle/wrapper/gradle-wrapper.properties') }}"
       }
     }
   },
