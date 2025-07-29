@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemeProvider } from '@/constants/ThemeContext';
+import { FavoritesProvider } from '@/constants/FavoritesContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { setupNotificationHandler, getPendingFareResults } from '../services/backgroundTracking';
@@ -65,7 +66,8 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>
       <ThemeProvider>
-        <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <FavoritesProvider>
+          <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack
             screenOptions={{
               headerShown: false,
@@ -87,7 +89,8 @@ export default function RootLayout() {
             />
           </Stack>
           <StatusBar style="auto" />
-        </NavigationThemeProvider>
+          </NavigationThemeProvider>
+        </FavoritesProvider>
       </ThemeProvider>
       </BottomSheetModalProvider>
     </GestureHandlerRootView>

@@ -2,16 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { saveTrip, analyzeSimilarTrips } from '../../firestoreHelpers';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/constants/ThemeContext';
+import { useFavorites } from '@/constants/FavoritesContext';
 
 export default function FareResults() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const { theme } = useTheme();
+  const { addFavorite } = useFavorites();
+
   const [paidFare, setPaidFare] = useState(params.paidFare || '');
   const [showResults, setShowResults] = useState(!!params.paidFare);
   const [inputValue, setInputValue] = useState(params.paidFare || '');
   const [saving, setSaving] = useState(false);
   const [analysisData, setAnalysisData] = useState(null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [addingToFavorites, setAddingToFavorites] = useState(false);
 
   useEffect(() => {
     if (!params.paidFare) {
@@ -60,539 +67,677 @@ export default function FareResults() {
         
         const success = await saveTrip(tripData);
         if (success) {
-          Alert.alert('تم حفظ الرحلة بنجاح');
+          Alert.alert('شكراً!', 'تم حفظ الرحلة بنجاح');
         } else {
-          Alert.alert('حدث خطأ أثناء حفظ الرحلة');
+          Alert.alert('خطأ', 'حدث خطأ أثناء حفظ الرحلة');
         }
       } catch (error) {
         console.error('Error saving trip:', error);
-        Alert.alert('حدث خطأ أثناء حفظ الرحلة');
+        Alert.alert('خطأ', 'حدث خطأ أثناء حفظ الرحلة');
       } finally {
         setSaving(false);
       }
     }
   };
 
-  // Get analysis data or fallback to mock data
+  const handleAddToFavorites = async () => {
+    if (!params.from || !params.to) {
+      Alert.alert('خطأ', 'لا يمكن إضافة مواقع غير مكتملة للمفضلة');
+      return;
+    }
+
+    setAddingToFavorites(true);
+    try {
+      const fromLocation = {
+        name: params.from,
+        lat: params.from_lat ? Number(params.from_lat) : null,
+        lng: params.from_lng ? Number(params.from_lng) : null
+      };
+
+      const toLocation = {
+        name: params.to,
+        lat: params.to_lat ? Number(params.to_lat) : null,
+        lng: params.to_lng ? Number(params.to_lng) : null
+      };
+
+      // Validate both locations have coordinates
+      if (!fromLocation.lat || !fromLocation.lng || !toLocation.lat || !toLocation.lng) {
+        Alert.alert('خطأ', 'بيانات المواقع غير مكتملة');
+        return;
+      }
+
+      // Add from location to favorites
+      const fromResult = await addFavorite(fromLocation);
+      // Add to location to favorites
+      const toResult = await addFavorite(toLocation);
+
+      // Show appropriate success/error message
+      let successCount = 0;
+      let messages = [];
+
+      if (fromResult.success) {
+        successCount++;
+        messages.push(`تم حفظ موقع "${fromLocation.name}"`);
+      } else if (fromResult.error !== 'هذا الموقع موجود بالفعل في المفضلة') {
+        messages.push(`خطأ في حفظ موقع البداية: ${fromResult.error}`);
+      }
+
+      if (toResult.success) {
+        successCount++;
+        messages.push(`تم حفظ موقع "${toLocation.name}"`);
+      } else if (toResult.error !== 'هذا الموقع موجود بالفعل في المفضلة') {
+        messages.push(`خطأ في حفظ موقع الوجهة: ${toResult.error}`);
+      }
+
+      if (successCount > 0) {
+        Alert.alert('تم!', `تم حفظ ${successCount} موقع في المفضلة`);
+      } else {
+        Alert.alert('تنبيه', 'المواقع موجودة بالفعل في المفضلة');
+      }
+    } catch (error) {
+      console.error('Error adding to favorites:', error);
+      Alert.alert('خطأ', 'حدث خطأ أثناء إضافة المواقع للمفضلة');
+    } finally {
+      setAddingToFavorites(false);
+    }
+  };
+
+  // Get analysis data - no mock data fallback
   const getAnalysisData = () => {
     if (!analysisData || !analysisData.success) {
       return {
         hasData: false,
-        fareDistribution: [10, 20, 30, 40, 30, 20, 10],
-        timeOfDay: {
-          morning: { avg: 35, count: 15 },
-          afternoon: { avg: 32, count: 20 },
-          evening: { avg: 38, count: 18 },
-          night: { avg: 30, count: 12 }
-        },
-        dayOfWeek: {
-          sunday: { avg: 36, count: 8 },
-          monday: { avg: 38, count: 12 },
-          tuesday: { avg: 35, count: 10 },
-          wednesday: { avg: 34, count: 9 },
-          thursday: { avg: 37, count: 11 },
-          friday: { avg: 40, count: 15 },
-          saturday: { avg: 42, count: 18 }
-        },
-        averageFare: 36,
-        fareRange: { min: 25, max: 50 }
+        similarTripsData: [],
+        timeBasedData: [],
+        weeklyData: [],
+        averageFare: 0,
+        fareRange: { min: 0, max: 0 }
       };
     }
 
     const data = analysisData.data;
-    
-    // Check if we have any similar trips
     const hasData = data.similarTripsCount > 0;
     
     if (!hasData) {
       return {
         hasData: false,
-        fareDistribution: [],
-        timeOfDay: { morning: { avg: 0, count: 0 }, afternoon: { avg: 0, count: 0 }, evening: { avg: 0, count: 0 }, night: { avg: 0, count: 0 } },
-        dayOfWeek: { sunday: { avg: 0, count: 0 }, monday: { avg: 0, count: 0 }, tuesday: { avg: 0, count: 0 }, wednesday: { avg: 0, count: 0 }, thursday: { avg: 0, count: 0 }, friday: { avg: 0, count: 0 }, saturday: { avg: 0, count: 0 } },
+        similarTripsData: [],
+        timeBasedData: [],
+        weeklyData: [],
         averageFare: 0,
         fareRange: { min: 0, max: 0 }
       };
     }
     
-    // Create fare distribution data
-    const fareDistribution = data.fareDistribution.length > 0 
-      ? data.fareDistribution.map(item => item.count * 2) // Scale for visualization
-      : [10, 20, 30, 40, 30, 20, 10];
-
-    // Time of day data
-    const timeOfDay = data.timeBasedAverage || {
-      morning: { avg: 35, count: 15 },
-      afternoon: { avg: 32, count: 20 },
-      evening: { avg: 38, count: 18 },
-      night: { avg: 30, count: 12 }
+    // Transform Firebase data structure to chart format
+    const transformTimeBasedData = (timeData) => {
+      if (!timeData || typeof timeData !== 'object') return [];
+      
+      const timeMapping = {
+        morning: '6-12 ص',
+        afternoon: '12-6 ع', 
+        evening: '6-12 م',
+        night: '12-6 ص'
+      };
+      
+      return Object.entries(timeData)
+        .filter(([_, value]) => value.count > 0)
+        .map(([key, value]) => ({
+          time: timeMapping[key] || key,
+          avgFare: Math.round(value.avg)
+        }));
     };
 
-    // Day of week data
-    const dayOfWeek = data.dayBasedAverage || {
-      sunday: { avg: 36, count: 8 },
-      monday: { avg: 38, count: 12 },
-      tuesday: { avg: 35, count: 10 },
-      wednesday: { avg: 34, count: 9 },
-      thursday: { avg: 37, count: 11 },
-      friday: { avg: 40, count: 15 },
-      saturday: { avg: 42, count: 18 }
+    const transformDayBasedData = (dayData) => {
+      if (!dayData || typeof dayData !== 'object') return [];
+      
+      const dayMapping = {
+        sunday: 'الأحد',
+        monday: 'الاثنين', 
+        tuesday: 'الثلاثاء',
+        wednesday: 'الأربعاء',
+        thursday: 'الخميس',
+        friday: 'الجمعة',
+        saturday: 'السبت'
+      };
+      
+      return Object.entries(dayData)
+        .filter(([_, value]) => value.count > 0)
+        .map(([key, value]) => ({
+          day: dayMapping[key] || key,
+          avgFare: Math.round(value.avg)
+        }));
+    };
+
+    const transformDistanceBasedData = (distanceData) => {
+      if (!distanceData || typeof distanceData !== 'object') return [];
+      
+      const distanceMapping = {
+        short: '0-5 كم',
+        medium: '5-15 كم',
+        long: '15+ كم'
+      };
+      
+      return Object.entries(distanceData)
+        .filter(([_, value]) => value.count > 0)
+        .map(([key, value]) => ({
+          distance: distanceMapping[key] || key,
+          avgFare: Math.round(value.avg),
+          count: value.count
+        }));
     };
 
     return {
       hasData: true,
-      fareDistribution,
-      timeOfDay,
-      dayOfWeek,
-      averageFare: data.averageFare || 36,
-      fareRange: data.fareRange || { min: 25, max: 50 }
+      similarTripsData: transformDistanceBasedData(data.distanceBasedAverage),
+      timeBasedData: transformTimeBasedData(data.timeBasedAverage),
+      weeklyData: transformDayBasedData(data.dayBasedAverage),
+      averageFare: data.averageFare || 45,
+      fareRange: data.fareRange || { min: 25, max: 65 }
     };
   };
 
   const analysis = getAnalysisData();
+  const styles = createStyles(theme);
+
+  const CustomBarChart = ({ data, dataKey, title }) => {
+    if (!data || data.length === 0) return null;
+    
+    const maxValue = Math.max(...data.map(item => item[dataKey]));
+    
+    return (
+      <View style={styles.chartContainer}>
+        <Text style={styles.chartTitle}>{title}</Text>
+        <View style={styles.barsContainer}>
+          {data.map((item, index) => {
+            const barHeight = (item[dataKey] / maxValue) * 120;
+            return (
+              <View key={index} style={styles.barItem}>
+                <View style={styles.barWrapper}>
+                  <View style={[styles.bar, { height: barHeight, backgroundColor: theme.primary }]} />
+                </View>
+                <Text style={styles.barLabel} numberOfLines={1}>{item.distance || item.time || item.day}</Text>
+                <Text style={styles.barValue}>{item[dataKey]}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <View style={styles.container}>
-        <Text style={styles.title}>نتيجة الأجرة</Text>
-        {!showResults && (
-          <View style={styles.paidInputBox}>
-            <Text style={styles.paidInputLabel}>كم دفعت؟</Text>
-            <TextInput
-              style={styles.paidInput}
-              placeholder="الأجرة المدفوعة (جنيه)"
-              keyboardType="numeric"
-              value={inputValue}
-              onChangeText={setInputValue}
-            />
-            <TouchableOpacity 
-              style={styles.paidInputButton} 
-              onPress={handlePaidFareSubmit}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.paidInputButtonText}>تأكيد</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryLabel}>الأجرة المتوقعة</Text>
-          <Text style={styles.estimateValue}>{params.estimate || 38} جنيه</Text>
-          {showResults && paidFare && (
-            <>
-              <Text style={styles.summaryLabel}>ما دفعته فعلياً</Text>
-              <Text style={styles.paidValue}>{paidFare} جنيه</Text>
-            </>
-          )}
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.push('/')}>
+            <Ionicons name="arrow-forward" size={20} color={theme.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>نتائج الرحلة</Text>
+          <View style={styles.headerSpacer} />
         </View>
+      </View>
 
-        {loadingAnalysis && (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#d32f2f" />
-            <Text style={styles.loadingText}>جاري تحليل الرحلات المشابهة...</Text>
-          </View>
-        )}
-
-        {analysisData && analysisData.success && analysisData.data.similarTripsCount > 0 && (
-          <View style={styles.infoBox}>
-            <Text style={styles.infoTitle}>معلومات إضافية</Text>
-            <Text style={styles.infoText}>
-              تم العثور على {analysisData.data.similarTripsCount} رحلة مشابهة
-            </Text>
-            <Text style={styles.infoText}>
-              نطاق الأجرة: {analysisData.data.fareRange.min} - {analysisData.data.fareRange.max} جنيه
-            </Text>
-          </View>
-        )}
-
-        {analysisData && analysisData.success && analysisData.data.similarTripsCount === 0 && (
-          <View style={styles.noDataBox}>
-            <Text style={styles.noDataTitle}>لا توجد بيانات كافية</Text>
-            <Text style={styles.noDataText}>
-              أنت أول من يسجل رحلة لهذا المسار في منطقتك
-            </Text>
-            <Text style={styles.noDataText}>
-              ساعد الآخرين بمعرفة الأجرة المدفوعة!
-            </Text>
-          </View>
-        )}
-        {/* Fare Distribution Graph - Only show if we have data */}
-        {analysis.hasData && analysis.fareDistribution.length > 0 && (
-          <View style={styles.analysisBox}>
-            <Text style={styles.analysisTitle}>توزيع الأجرة</Text>
-            <Text style={styles.analysisSubtitle}>
-              نطاق السعر: {analysis.fareRange.min} - {analysis.fareRange.max} جنيه
-            </Text>
-            <View style={styles.fareDistributionContainer}>
-              {analysis.fareDistribution.map((height, index) => {
-                const fareValue = analysis.fareRange.min + (index * (analysis.fareRange.max - analysis.fareRange.min) / analysis.fareDistribution.length);
-                const isYourFare = paidFare && fareValue <= Number(paidFare) && fareValue + ((analysis.fareRange.max - analysis.fareRange.min) / analysis.fareDistribution.length) > Number(paidFare);
-                return (
-                  <View key={index} style={styles.distributionBarContainer}>
-                    <View 
-                      style={[
-                        styles.distributionBar, 
-                        { 
-                          height: 20 + height,
-                          backgroundColor: isYourFare ? '#1976d2' : '#d32f2f'
-                        }
-                      ]} 
-                    />
-                    <Text style={styles.distributionLabel}>{Math.round(fareValue)}</Text>
-                  </View>
-                );
-              })}
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Fare Summary Card */}
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <View style={styles.fareIconContainer}>
+              <Ionicons name="cash" size={48} color={theme.primary} />
+              <Text style={styles.fareLabel}>السعر المقترح</Text>
+              <Text style={styles.estimatedFare}>{params.estimate || 45} جنيه</Text>
             </View>
-            {paidFare && (
-              <Text style={styles.yourFareLabel}>
-                أجرة رحلتك: {paidFare} جنيه
-              </Text>
+
+            {showResults && paidFare ? (
+              <View style={styles.successContainer}>
+                <Text style={styles.successText}>دفعت: {paidFare} جنيه</Text>
+                <Text style={styles.successSubtext}>شكراً لمساهمتك في تحسين الخدمة</Text>
+              </View>
+            ) : (
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.fareInput}
+                  placeholder="كم دفعت فعلياً؟"
+                  keyboardType="numeric"
+                  value={inputValue}
+                  onChangeText={setInputValue}
+                  placeholderTextColor={theme.textSecondary}
+                />
+                <TouchableOpacity
+                  style={[styles.submitButton, { opacity: inputValue ? 1 : 0.5 }]}
+                  onPress={handlePaidFareSubmit}
+                  disabled={!inputValue || saving}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.submitButtonText}>إرسال</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             )}
           </View>
-        )}
+        </View>
 
-        {/* Time of Day Comparison - Only show if we have meaningful data */}
-        {analysis.hasData && Object.values(analysis.timeOfDay).some(d => d.count > 0) && (
-          <View style={styles.analysisBox}>
-            <Text style={styles.analysisTitle}>الأجرة حسب الوقت</Text>
-            <Text style={styles.analysisSubtitle}>أفضل وقت للسفر</Text>
-            <View style={styles.timeComparisonContainer}>
-              {Object.entries(analysis.timeOfDay).map(([time, data]) => {
-                const timeLabels = {
-                  morning: 'صباحاً',
-                  afternoon: 'ظهراً',
-                  evening: 'مساءً',
-                  night: 'ليلاً'
-                };
-                const maxAvg = Math.max(...Object.values(analysis.timeOfDay).map(d => d.avg));
-                const barHeight = maxAvg > 0 ? (data.avg / maxAvg) * 60 : 0;
-                const isBestTime = data.avg === Math.min(...Object.values(analysis.timeOfDay).map(d => d.avg));
-                
-                return (
-                  <View key={time} style={styles.timeBarContainer}>
-                    <Text style={styles.timeLabel}>{timeLabels[time]}</Text>
-                    <View style={styles.timeBarWrapper}>
-                      <View 
-                        style={[
-                          styles.timeBar, 
-                          { 
-                            height: barHeight,
-                            backgroundColor: isBestTime ? '#4caf50' : '#d32f2f'
-                          }
-                        ]} 
-                      />
-                    </View>
-                    <Text style={styles.timeValue}>{data.avg} جنيه</Text>
-                    <Text style={styles.timeCount}>({data.count} رحلة)</Text>
-                  </View>
-                );
-              })}
+        {/* Trip Details Card */}
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <Text style={styles.cardTitle}>تفاصيل الرحلة</Text>
+            <View style={styles.detailsContainer}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>المسافة:</Text>
+                <Text style={styles.detailValue}>{params.distance || '4.2'} كم</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>المدة:</Text>
+                <Text style={styles.detailValue}>{params.duration || '18'} دقيقة</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>الوقت:</Text>
+                <Text style={styles.detailValue}>{params.time || '3:45 مساءً'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>من:</Text>
+                <Text style={styles.detailValue} numberOfLines={1}>{params.from || 'غير محدد'}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>إلى:</Text>
+                <Text style={styles.detailValue} numberOfLines={1}>{params.to || 'غير محدد'}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Add to Favorites Button */}
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <TouchableOpacity
+              style={styles.favoriteButton}
+              onPress={handleAddToFavorites}
+              disabled={addingToFavorites}
+            >
+              <Ionicons name="heart" size={20} color="#FFFFFF" style={styles.favoriteIcon} />
+              {addingToFavorites ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.favoriteButtonText}>إضافة للمفضلة</Text>
+              )}
+            </TouchableOpacity>
+            <Text style={styles.favoriteHint}>احفظ هذه الرحلة للوصول السريع لاحقاً</Text>
+          </View>
+        </View>
+
+        {/* Loading Analysis */}
+        {loadingAnalysis && (
+          <View style={styles.card}>
+            <View style={styles.cardContent}>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <Text style={styles.loadingText}>جاري تحليل الرحلات المشابهة...</Text>
+              </View>
             </View>
           </View>
         )}
 
-        {/* Day of Week Comparison - Only show if we have meaningful data */}
-        {analysis.hasData && Object.values(analysis.dayOfWeek).some(d => d.count > 0) && (
-          <View style={styles.analysisBox}>
-            <Text style={styles.analysisTitle}>الأجرة حسب اليوم</Text>
-            <Text style={styles.analysisSubtitle}>أفضل يوم للسفر</Text>
-            <View style={styles.dayComparisonContainer}>
-              {Object.entries(analysis.dayOfWeek).map(([day, data]) => {
-                const dayLabels = {
-                  sunday: 'الأحد',
-                  monday: 'الاثنين',
-                  tuesday: 'الثلاثاء',
-                  wednesday: 'الأربعاء',
-                  thursday: 'الخميس',
-                  friday: 'الجمعة',
-                  saturday: 'السبت'
-                };
-                const maxAvg = Math.max(...Object.values(analysis.dayOfWeek).map(d => d.avg));
-                const barHeight = maxAvg > 0 ? (data.avg / maxAvg) * 60 : 0;
-                const isBestDay = data.avg === Math.min(...Object.values(analysis.dayOfWeek).map(d => d.avg));
-                
-                return (
-                  <View key={day} style={styles.dayBarContainer}>
-                    <Text style={styles.dayLabel}>{dayLabels[day]}</Text>
-                    <View style={styles.dayBarWrapper}>
-                      <View 
-                        style={[
-                          styles.dayBar, 
-                          { 
-                            height: barHeight,
-                            backgroundColor: isBestDay ? '#4caf50' : '#d32f2f'
-                          }
-                        ]} 
-                      />
+        {/* Analysis Results */}
+        {!loadingAnalysis && (
+          <>
+            {/* Data Source Info */}
+            {analysisData && analysisData.success && analysisData.data.similarTripsCount > 0 && (
+              <View style={styles.card}>
+                <View style={styles.cardContent}>
+                  <View style={styles.infoContainer}>
+                    <Ionicons name="information-circle" size={24} color={theme.primary} />
+                    <View style={styles.infoTextContainer}>
+                      <Text style={styles.infoTitle}>معلومات إضافية</Text>
+                      <Text style={styles.infoText}>
+                        تم العثور على {analysisData.data.similarTripsCount} رحلة مشابهة
+                      </Text>
+                      <Text style={styles.infoText}>
+                        نطاق الأجرة: {analysisData.data.fareRange?.min || 25} - {analysisData.data.fareRange?.max || 65} جنيه
+                      </Text>
                     </View>
-                    <Text style={styles.dayValue}>{data.avg} جنيه</Text>
-                    <Text style={styles.dayCount}>({data.count} رحلة)</Text>
                   </View>
-                );
-              })}
+                </View>
+              </View>
+            )}
+
+            {/* Similar Trips Chart */}
+            <View style={styles.card}>
+              <View style={styles.cardContent}>
+                <View style={styles.chartHeader}>
+                  <Ionicons name="trending-up" size={20} color={theme.primary} />
+                  <Text style={styles.chartHeaderText}>متوسط الأسعار للرحلات المشابهة</Text>
+                </View>
+                <CustomBarChart
+                  data={analysis.similarTripsData.slice(0, 4)}
+                  dataKey="avgFare"
+                  title=""
+                />
+              </View>
             </View>
-          </View>
+
+            {/* Time-based Chart */}
+            <View style={styles.card}>
+              <View style={styles.cardContent}>
+                <View style={styles.chartHeader}>
+                  <Ionicons name="time" size={20} color={theme.primary} />
+                  <Text style={styles.chartHeaderText}>الأسعار حسب الوقت</Text>
+                </View>
+                <CustomBarChart
+                  data={analysis.timeBasedData.slice(0, 6)}
+                  dataKey="avgFare"
+                  title=""
+                />
+              </View>
+            </View>
+
+            {/* Weekly Chart */}
+            <View style={styles.card}>
+              <View style={styles.cardContent}>
+                <View style={styles.chartHeader}>
+                  <Ionicons name="calendar" size={20} color={theme.primary} />
+                  <Text style={styles.chartHeaderText}>الأسعار حسب اليوم</Text>
+                </View>
+                <CustomBarChart
+                  data={analysis.weeklyData}
+                  dataKey="avgFare"
+                  title=""
+                />
+              </View>
+            </View>
+
+            {/* No Real Data Message - only when we have no real analysis data */}
+            {(!analysisData || !analysisData.success || analysisData.data.similarTripsCount === 0) && (
+              <View style={styles.card}>
+                <View style={styles.cardContent}>
+                  <View style={styles.noDataContainer}>
+                    <Ionicons name="information-circle" size={48} color={theme.textSecondary} />
+                    <Text style={styles.noDataSubText}>
+                      ساعد في تحسين دقة البيانات بمشاركة رحلاتك!
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </>
         )}
-      </View>
-    </ScrollView>
+
+        {/* Back to Home Button */}
+        <View style={styles.card}>
+          <View style={styles.cardContent}>
+            <TouchableOpacity
+              style={styles.homeButton}
+              onPress={() => router.push('/')}
+            >
+              <Text style={styles.homeButtonText}>العودة للرئيسية</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Bottom Padding */}
+        <View style={styles.bottomPadding} />
+      </ScrollView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  scrollContainer: {
-    flexGrow: 1,
-    backgroundColor: '#fff',
-  },
+const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    justifyContent: 'flex-start',
+    backgroundColor: '#F9FAFB',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#d32f2f',
-    marginBottom: 24,
-    textAlign: 'center',
+  header: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  paidInputBox: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 20,
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    maxWidth: 400,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  paidInputLabel: {
-    fontSize: 16,
-    color: '#222',
-    marginBottom: 8,
-  },
-  paidInput: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 16,
-    width: 120,
-    textAlign: 'center',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  paidInputButton: {
-    backgroundColor: '#d32f2f',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-  paidInputButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  summaryBox: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  summaryLabel: {
-    fontSize: 16,
-    color: '#888',
-    marginBottom: 4,
-  },
-  estimateValue: {
-    fontSize: 32,
-    color: '#d32f2f',
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  paidValue: {
-    fontSize: 28,
-    color: '#1976d2',
-    fontWeight: 'bold',
-    marginTop: 4,
-  },
-  analysisBox: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 16,
-  },
-  analysisTitle: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#222',
-    marginBottom: 4,
-    textAlign: 'center',
+    color: theme.text,
   },
-  analysisSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-    textAlign: 'center',
+  headerSpacer: {
+    width: 40,
   },
-  // Fare Distribution Graph Styles
-  fareDistributionContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingHorizontal: 8,
-  },
-  distributionBarContainer: {
-    alignItems: 'center',
+  scrollView: {
     flex: 1,
   },
-  distributionBar: {
-    width: 12,
-    borderRadius: 6,
-    marginBottom: 4,
+  card: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  distributionLabel: {
-    fontSize: 10,
-    color: '#666',
-    textAlign: 'center',
+  cardContent: {
+    padding: 24,
   },
-  yourFareLabel: {
-    fontSize: 14,
+  cardTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#1976d2',
-    textAlign: 'center',
+    color: theme.text,
+    marginBottom: 16,
+  },
+  fareIconContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  fareLabel: {
+    fontSize: 16,
+    color: theme.textSecondary,
     marginTop: 8,
-  },
-  // Time of Day Comparison Styles
-  timeComparisonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: 8,
-  },
-  timeBarContainer: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  timeLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  timeBarWrapper: {
-    height: 60,
-    justifyContent: 'flex-end',
-    marginBottom: 4,
-  },
-  timeBar: {
-    width: 20,
-    borderRadius: 10,
-    minHeight: 8,
-  },
-  timeValue: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#222',
-    textAlign: 'center',
-  },
-  timeCount: {
-    fontSize: 10,
-    color: '#888',
-    textAlign: 'center',
-  },
-  // Day of Week Comparison Styles
-  dayComparisonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: 4,
-  },
-  dayBarContainer: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  dayLabel: {
-    fontSize: 10,
-    color: '#666',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  dayBarWrapper: {
-    height: 60,
-    justifyContent: 'flex-end',
-    marginBottom: 4,
-  },
-  dayBar: {
-    width: 16,
-    borderRadius: 8,
-    minHeight: 8,
-  },
-  dayValue: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#222',
-    textAlign: 'center',
-  },
-  dayCount: {
-    fontSize: 8,
-    color: '#888',
-    textAlign: 'center',
-  },
-  loadingBox: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#666',
-    fontSize: 16,
-    marginTop: 12,
-  },
-  infoBox: {
-    backgroundColor: '#e3f2fd',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#1976d2',
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1976d2',
     marginBottom: 8,
   },
-  infoText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
+  estimatedFare: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: theme.primary,
   },
-  noDataBox: {
-    backgroundColor: '#fff3cd',
-    borderRadius: 10,
+  successContainer: {
+    backgroundColor: '#F0F9F0',
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: '#ffc107',
     alignItems: 'center',
   },
-  noDataTitle: {
+  successText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#856404',
+    color: '#2E7D32',
+    marginBottom: 4,
+  },
+  successSubtext: {
+    fontSize: 14,
+    color: '#388E3C',
+  },
+  inputContainer: {
+    gap: 12,
+  },
+  fareInput: {
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 18,
+    textAlign: 'center',
+    color: theme.text,
+  },
+  submitButton: {
+    backgroundColor: theme.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  detailsContainer: {
+    gap: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: theme.textSecondary,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: theme.text,
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'left',
+    marginLeft: 16,
+  },
+  favoriteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E91E63',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 8,
+  },
+  favoriteIcon: {
+    marginLeft: 8,
+  },
+  favoriteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  favoriteHint: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: theme.textSecondary,
+    marginTop: 12,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  chartHeaderText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.text,
+    marginLeft: 8,
+  },
+  chartContainer: {
+    marginTop: 8,
+  },
+  chartTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: theme.text,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  barsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingHorizontal: 8,
+  },
+  barItem: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 2,
+  },
+  barWrapper: {
+    height: 120,
+    justifyContent: 'flex-end',
+    marginBottom: 8,
+  },
+  bar: {
+    width: 24,
+    borderRadius: 4,
+    minHeight: 8,
+  },
+  barLabel: {
+    fontSize: 10,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  barValue: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: theme.text,
+    textAlign: 'center',
+  },
+  noDataContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  noDataTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.text,
+    marginTop: 12,
     marginBottom: 8,
   },
   noDataText: {
     fontSize: 14,
-    color: '#856404',
-    marginBottom: 4,
+    color: theme.textSecondary,
     textAlign: 'center',
+    marginBottom: 4,
+  },
+  noDataSubText: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    textAlign: 'center',
+  },
+  homeButton: {
+    borderWidth: 2,
+    borderColor: theme.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  homeButtonText: {
+    color: theme.primary,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  bottomPadding: {
+    height: 32,
   },
 }); 

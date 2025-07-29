@@ -112,11 +112,14 @@ export async function getAddressFromCoords(lat, lng) {
 // Search places using Mapbox Geocoding API
 export async function searchPlacesMapbox(query, currentLocation = null) {
   try {
-    let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&language=ar,en&limit=5&types=poi,place,address`;
+    let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&language=ar,en&limit=10&types=poi,place,address&country=EG`;
     
-    // Add proximity if we have current location
+    // Add proximity if we have current location (prioritize results near user)
     if (currentLocation) {
       url += `&proximity=${currentLocation.longitude},${currentLocation.latitude}`;
+    } else {
+      // Default to Cairo center if no current location
+      url += `&proximity=31.2357,30.0444`;
     }
     
     const res = await fetch(url);

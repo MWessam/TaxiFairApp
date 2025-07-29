@@ -36,7 +36,10 @@ export default {
         "ACCESS_BACKGROUND_LOCATION",
         "FOREGROUND_SERVICE",
         "WAKE_LOCK"
-      ]
+      ],
+      "enableProguardInReleaseBuilds": true,
+      "enableSeparateBuildPerCPUArchitecture": true,
+      "universalApk": false
     },
     "web": {
       "bundler": "metro",

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef, use } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Dimensions } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import * as Location from 'expo-location'; // Import expo-location
+import * as Location from 'expo-location';
 import { distillRoute, calculateRouteDistance, getGovernorateFromCoords, getAddressFromCoords } from '../../routeHelpers';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
@@ -14,15 +14,17 @@ import {
 } from '../../services/backgroundTracking';
 import locationService from '../../services/locationService';
 
+const { width, height } = Dimensions.get('window');
+
 export default function TrackRide() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const [isTracking, setIsTracking] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   const [route, setRoute] = useState([]);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [passengers, setPassengers] = useState('');
-
   // This function loads the tracked route from storage and updates the map
   const loadRouteFromStorage = async () => {
     const trackingData = await getCurrentTrackingData();
@@ -40,6 +42,7 @@ export default function TrackRide() {
       const checkTrackingStatus = async () => {
         const isActive = await isTrackingActive();
         setIsTracking(isActive);
+        setHasStarted(isActive);
         if (isActive) {
           loadRouteFromStorage();
         }
@@ -48,23 +51,19 @@ export default function TrackRide() {
       checkTrackingStatus();
 
       // Set up a listener to update the route on the map in real-time
-      // as the background task saves new points. This keeps the UI in sync
-      // when the app is brought back from the background.
       const interval = setInterval(async () => {
         const isActive = await isTrackingActive();
         if (isActive) {
           loadRouteFromStorage();
         }
-      }, 2000); // Update every 2 seconds for a smoother feel
+      }, 2000);
 
       return () => clearInterval(interval);
     }, [])
   );
-
   // This effect handles the case where the user taps the "stop tracking" notification
   useEffect(() => {
     if (params.finalize_trip === 'true') {
-      // Remove the param so it doesn't trigger again on screen focus
       router.setParams({ finalize_trip: '' }); 
       endTracking();
     }
@@ -100,6 +99,7 @@ export default function TrackRide() {
     if (success) {
       console.log('Started background location tracking');
       setIsTracking(true);
+      setHasStarted(true);
       console.log('Set isTracking to true');
     } else {
       console.log('Failed to start background tracking');
@@ -121,6 +121,7 @@ export default function TrackRide() {
         setLoading(false);
         await clearTrackingData();
         setIsTracking(false);
+        setHasStarted(false);
         setRoute([]);
         return;
       }
@@ -158,6 +159,7 @@ export default function TrackRide() {
       // Clean up storage
       await clearTrackingData();
       setIsTracking(false);
+      setHasStarted(false);
       setRoute([]);
 
       router.push({
@@ -183,106 +185,342 @@ export default function TrackRide() {
   };
   
   const getMapCenter = () => {
-    // Center on the latest point of the route, or a default location
+    // Always center on current location if available, otherwise default to Cairo
     if (currentLocation) {
       return [currentLocation.longitude, currentLocation.latitude];
     }
     return [31.2357, 30.0444]; // Default to Cairo
   };
 
+  const getDistanceText = () => {
+    if (route.length < 2) return "0 كم";
+    const distance = calculateRouteDistance(route);
+    return `${distance.toFixed(1)} كم`;
+  };
+
   return (
     <View style={styles.container}>
-      <MapboxGL.MapView style={styles.map}>
-        <MapboxGL.Camera
-          centerCoordinate={getMapCenter()}
-          zoomLevel={16}
-          animationMode='flyTo'
-          animationDuration={1200}
-          followUserLocation={!isTracking} // Follow user until tracking starts
-          followUserMode='normal'
-        />
-        
-        {/* This component provides the blue dot for the user's location */}
-        <MapboxGL.UserLocation 
-          visible={true}
-          showsUserHeadingIndicator={true}
-          onUpdate={(location) => setCurrentLocation(location.coords)}
-        />
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>←</Text>
+        </TouchableOpacity>
+        <View style={styles.headerTitle}>
+          <Text style={styles.headerTitleText}>تتبع الرحلة</Text>
+        </View>
+        <View style={styles.headerSpacer} />
+      </View>
 
-        {/* This component draws the tracked route line */}
-        {route.length > 1 && (
-          <MapboxGL.ShapeSource id="routeSource" shape={{
-            type: 'Feature',
-            geometry: { type: 'LineString', coordinates: route.map(p => [p.longitude, p.latitude]) },
-          }}>
-            <MapboxGL.LineLayer id="routeLine" style={{ lineColor: '#d32f2f', lineWidth: 4 }} />
-          </MapboxGL.ShapeSource>
-        )}
-      </MapboxGL.MapView>
+      {/* Map Area */}
+      {isTracking && (
+        <MapboxGL.MapView
+        style={styles.map}
+        scrollEnabled={false}
+        zoomEnabled={false}
+        rotateEnabled={false}
+        pitchEnabled={false}
+      >
+          <MapboxGL.Camera
+            followUserLocation={true}
+            followUserMode='normal'
+            followZoomLevel={16} // Use this prop for zoom level when following
+          />
+          
+          {/* User Location */}
+          <MapboxGL.UserLocation 
+            visible={true}
+            showsUserHeadingIndicator={true}
+            onUpdate={(location) => setCurrentLocation(location.coords)}
+          />
 
-      <View style={styles.bottomPanel}>
-        <Text style={styles.title}>ابدأ تتبع رحلتك</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="عدد الركاب (اختياري)"
-          keyboardType="numeric"
-          value={passengers}
-          onChangeText={setPassengers}
-        />
-        {!isTracking ? (
-          <TouchableOpacity style={styles.button} onPress={startTracking}>
-            <Text style={styles.buttonText}>ابدأ التتبع</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={[styles.button, { backgroundColor: '#222' }]} onPress={endTracking}>
-            <Text style={styles.buttonText}>انهاء التتبع</Text>
-          </TouchableOpacity>
-        )}
-        {loading && <ActivityIndicator size="large" color="#d32f2f" style={{ marginTop: 10 }} />}
+          {/* Route Line */}
+          {route.length > 1 && (
+            <MapboxGL.ShapeSource id="routeSource" shape={{
+              type: 'Feature',
+              geometry: { type: 'LineString', coordinates: route.map(p => [p.longitude, p.latitude]) },
+            }}>
+              <MapboxGL.LineLayer id="routeLine" style={{ lineColor: '#5C2633', lineWidth: 4 }} />
+            </MapboxGL.ShapeSource>
+          )}
+
+          {/* Start Location Pin */}
+          {hasStarted && route.length > 0 && (
+            <MapboxGL.PointAnnotation
+              id="startPoint"
+              coordinate={[route[0].longitude, route[0].latitude]}
+            >
+              <View style={styles.startPin}>
+                <Text style={styles.startPinText}>📍</Text>
+              </View>
+            </MapboxGL.PointAnnotation>
+            )}
+          </MapboxGL.MapView>
+      )}
+
+      {/* Bottom Control Modal */}
+      <View style={styles.bottomModal}>
+        <View style={styles.bottomCard}>
+          <View style={styles.bottomContent}>
+            {!hasStarted ? (
+              <View>
+                <Text style={styles.startTitle}>ابدأ تتبع رحلتك</Text>
+                <Text style={styles.startSubtitle}>اضغط على "بدء التتبع" لتسجيل رحلتك</Text>
+                
+                <TextInput
+                  style={styles.passengerInput}
+                  placeholder="عدد الركاب (اختياري)"
+                  placeholderTextColor="#666666"
+                  keyboardType="numeric"
+                  value={passengers}
+                  onChangeText={setPassengers}
+                />
+                
+                <TouchableOpacity style={styles.startButton} onPress={startTracking}>
+                  <Text style={styles.startButtonIcon}>▶️</Text>
+                  <Text style={styles.startButtonText}>بدء التتبع</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <View style={styles.trackingStatus}>
+                  <Text style={styles.trackingTitle}>
+                    {isTracking ? "جاري التتبع..." : "تم إيقاف التتبع"}
+                  </Text>
+                  <Text style={styles.trackingDistance}>المسافة المقطوعة: {getDistanceText()}</Text>
+                </View>
+
+                {isTracking ? (
+                  <TouchableOpacity style={styles.stopButton} onPress={endTracking}>
+                    <Text style={styles.stopButtonIcon}>⏹️</Text>
+                    <Text style={styles.stopButtonText}>إنهاء الرحلة</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={styles.resumeButton} onPress={startTracking}>
+                    <Text style={styles.resumeButtonIcon}>▶️</Text>
+                    <Text style={styles.resumeButtonText}>استئناف التتبع</Text>
+                  </TouchableOpacity>
+                )}
+                
+                {loading && <ActivityIndicator size="large" color="#5C2633" style={styles.loading} />}
+              </View>
+            )}
+          </View>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  map: { flex: 1 },
-  bottomPanel: {
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 60,
+    paddingBottom: 16,
+  },
+  backButton: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backButtonText: {
+    fontSize: 18,
+    color: '#5C2633',
+  },
+  headerTitle: {
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  headerTitleText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  map: {
+    flex: 1,
+  },
+  locationIndicator: {
+    position: 'absolute',
+    top: 120,
+    right: 16,
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  locationIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  locationTextContainer: {
+    flex: 1,
+  },
+  locationTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  locationSubtitle: {
+    fontSize: 12,
+    color: '#666666',
+  },
+  startPin: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startPinText: {
+    fontSize: 24,
+  },
+  bottomModal: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
     padding: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  },
+  bottomCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
     elevation: 8,
   },
-  title: {
-    fontSize: 20,
+  bottomContent: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  startTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#d32f2f',
-    marginBottom: 12,
+    color: '#1a1a1a',
+    marginBottom: 8,
     textAlign: 'center',
   },
-  input: {
+  startSubtitle: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  passengerInput: {
     backgroundColor: '#f5f5f5',
     borderRadius: 10,
     padding: 14,
     fontSize: 16,
-    marginBottom: 10,
-    color: '#222',
+    marginBottom: 16,
+    color: '#1a1a1a',
+    width: '100%',
+    textAlign: 'center',
   },
-  button: {
-    backgroundColor: '#d32f2f',
-    borderRadius: 10,
-    paddingVertical: 14,
+  startButton: {
+    backgroundColor: '#5C2633',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'center',
+    width: '100%',
   },
-  buttonText: {
-    color: '#fff',
+  startButtonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  startButtonText: {
+    color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  trackingStatus: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  trackingTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#5C2633',
+    marginBottom: 4,
+  },
+  trackingDistance: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  stopButton: {
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  stopButtonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  stopButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  resumeButton: {
+    backgroundColor: '#5C2633',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  resumeButtonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  resumeButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  loading: {
+    marginTop: 16,
   },
 });

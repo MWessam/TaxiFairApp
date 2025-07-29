@@ -81,63 +81,84 @@ export default function Home() {
       {/* Location Permission Request */}
       <LocationPermissionRequest />
       
-      {/* Header with governorate selector */}
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.appTitle}>تاكسي مصر</Text>
-        <TouchableOpacity 
-          style={styles.governorateSelector}
-          onPress={() => setShowGovernorateModal(true)}
-        >
-          <Text style={styles.governorateSelectorText}>
-            📍 {currentGovData?.name || 'المنصورة'}
-          </Text>
-          <Text style={styles.governorateSelectorArrow}>▼</Text>
-        </TouchableOpacity>
+        <Text style={styles.subtitle}>تتبع أسعار التاكسي في مصر</Text>
       </View>
 
       {/* Main content */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.mainContent}>
-          <Text style={styles.welcomeText}>مرحباً بك في تطبيق تاكسي مصر</Text>
-          <Text style={styles.subtitleText}>اختر الخدمة المناسبة لك</Text>
+          {/* Theme Selector Card */}
+          <View style={styles.themeCard}>
+            <View style={styles.themeCardHeader}>
+              <Text style={styles.themeCardIcon}>🎨</Text>
+              <Text style={styles.themeCardTitle}>اختر محافظتك</Text>
+            </View>
+            <View style={styles.themeGrid}>
+              {availableGovernorates.slice(0, 4).map((gov) => (
+                <TouchableOpacity
+                  key={gov.key}
+                  style={[
+                    styles.themeButton,
+                    currentGovernorate === gov.key && styles.selectedThemeButton
+                  ]}
+                  onPress={() => handleGovernorateSelect(gov.key)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.themeColorDot, { backgroundColor: gov.primary }]} />
+                  <Text style={[
+                    styles.themeButtonText,
+                    currentGovernorate === gov.key && styles.selectedThemeButtonText
+                  ]}>
+                    {gov.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
 
-          {/* Three main buttons */}
-          <View style={styles.buttonsContainer}>
+          {/* Main Track Ride Button */}
+          <Animated.View style={{ transform: [{ scale: buttonScale3 }] }}>
+            <TouchableOpacity 
+              style={styles.mainTrackButton} 
+              onPress={() => animateButton(buttonScale3, () => routerRef.current?.push('/(tabs)/TrackRide'))}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.mainTrackButtonIcon}>📍</Text>
+              <Text style={styles.mainTrackButtonText}>تتبع الرحلة</Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Secondary Buttons Grid */}
+          <View style={styles.secondaryButtonsGrid}>
             <Animated.View style={{ transform: [{ scale: buttonScale1 }] }}>
               <TouchableOpacity 
-                style={styles.mainButton} 
+                style={styles.secondaryButton} 
                 onPress={() => animateButton(buttonScale1, () => routerRef.current?.push('/(tabs)/SubmitTrip'))}
                 activeOpacity={0.8}
               >
-                <Text style={styles.buttonIcon}>🚗</Text>
-                <Text style={styles.buttonTitle}>شارك رحلتك</Text>
-                <Text style={styles.buttonSubtitle}>شارك تكلفة الرحلة مع الآخرين</Text>
+                <Text style={styles.secondaryButtonIcon}>➕</Text>
+                <Text style={styles.secondaryButtonText}>إضافة رحلة</Text>
               </TouchableOpacity>
             </Animated.View>
 
             <Animated.View style={{ transform: [{ scale: buttonScale2 }] }}>
               <TouchableOpacity 
-                style={styles.mainButton} 
-                onPress={() => animateButton(buttonScale2, () => routerRef.current?.push('/(other)/EstimateFare'))}
+                style={styles.secondaryButton} 
+                onPress={() => animateButton(buttonScale2, () => routerRef.current?.push('/(tabs)/SubmitTrip?mode=estimate'))}
                 activeOpacity={0.8}
               >
-                <Text style={styles.buttonIcon}>💰</Text>
-                <Text style={styles.buttonTitle}>احسب الأجرة</Text>
-                <Text style={styles.buttonSubtitle}>احسب تكلفة رحلتك قبل السفر</Text>
+                <Text style={styles.secondaryButtonIcon}>💰</Text>
+                <Text style={styles.secondaryButtonText}>تقدير السعر</Text>
               </TouchableOpacity>
             </Animated.View>
+          </View>
 
-            <Animated.View style={{ transform: [{ scale: buttonScale3 }] }}>
-              <TouchableOpacity 
-                style={styles.mainButton} 
-                onPress={() => animateButton(buttonScale3, () => routerRef.current?.push('/(tabs)/TrackRide'))}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.buttonIcon}>📍</Text>
-                <Text style={styles.buttonTitle}>تتبع الرحلة</Text>
-                <Text style={styles.buttonSubtitle}>تتبع رحلتك في الوقت الفعلي</Text>
-              </TouchableOpacity>
-            </Animated.View>
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>ساعد في تحسين أسعار التاكسي في مصر</Text>
           </View>
         </View>
       </ScrollView>
@@ -197,40 +218,25 @@ export default function Home() {
 const createStyles = (theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.background,
+    backgroundColor: '#f5f5f5', // Light gray background like web version
   },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
-    backgroundColor: theme.primary,
     alignItems: 'center',
   },
   appTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: theme.textOnPrimary,
-    marginBottom: 15,
+    color: '#5C2633', // Primary color from web version
+    marginBottom: 8,
     textAlign: 'center',
   },
-  governorateSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.secondary,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  governorateSelectorText: {
+  subtitle: {
     fontSize: 16,
-    color: theme.text,
-    marginRight: 8,
-  },
-  governorateSelectorArrow: {
-    fontSize: 12,
-    color: theme.textSecondary,
+    color: '#666666', // Secondary text color
+    textAlign: 'center',
   },
   scrollContent: {
     flexGrow: 1,
@@ -238,58 +244,129 @@ const createStyles = (theme) => StyleSheet.create({
   mainContent: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingTop: 20,
   },
-  welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: theme.text,
-    textAlign: 'center',
-    marginBottom: 8,
+  themeCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  subtitleText: {
-    fontSize: 16,
-    color: theme.textSecondary,
-    textAlign: 'center',
-    marginBottom: 40,
-  },
-  buttonsContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 20,
-  },
-  mainButton: {
-    backgroundColor: theme.surface,
-    borderRadius: 15,
-    padding: 25,
+  themeCardHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  themeCardIcon: {
+    fontSize: 20,
+    marginRight: 8,
+    color: '#5C2633',
+  },
+  themeCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+  },
+  themeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  themeButton: {
+    flex: 1,
+    minWidth: '45%',
+    padding: 12,
+    borderRadius: 8,
     borderWidth: 2,
-    borderColor: theme.primary,
-    shadowColor: theme.primary,
+    borderColor: '#e5e5e5',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  selectedThemeButton: {
+    borderColor: '#5C2633',
+    backgroundColor: 'rgba(92, 38, 51, 0.1)',
+  },
+  themeColorDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  themeButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1a1a1a',
+  },
+  selectedThemeButtonText: {
+    color: '#5C2633',
+  },
+  mainTrackButton: {
+    backgroundColor: '#5C2633',
+    height: 64,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+    shadowColor: '#5C2633',
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 5,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  buttonIcon: {
-    fontSize: 40,
-    marginBottom: 10,
+  mainTrackButtonIcon: {
+    fontSize: 24,
+    marginRight: 8,
   },
-  buttonTitle: {
+  mainTrackButtonText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: theme.primary,
-    marginBottom: 5,
-    textAlign: 'center',
+    color: 'white',
   },
-  buttonSubtitle: {
+  secondaryButtonsGrid: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 40,
+  },
+  secondaryButton: {
+    flex: 1,
+    height: 56,
+    borderWidth: 2,
+    borderColor: '#5C2633',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#5C2633',
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  footerText: {
     fontSize: 14,
-    color: theme.textSecondary,
+    color: '#666666',
     textAlign: 'center',
-    lineHeight: 20,
   },
   modalOverlay: {
     flex: 1,
@@ -297,7 +374,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: theme.background,
+    backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: height * 0.7,
@@ -309,19 +386,19 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: theme.border,
+    borderBottomColor: '#e5e5e5',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: theme.text,
+    color: '#1a1a1a',
   },
   closeButton: {
     padding: 5,
   },
   closeButtonText: {
     fontSize: 20,
-    color: theme.textSecondary,
+    color: '#666666',
   },
   governorateItem: {
     flexDirection: 'row',
@@ -329,10 +406,10 @@ const createStyles = (theme) => StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: theme.border,
+    borderBottomColor: '#e5e5e5',
   },
   selectedGovernorateItem: {
-    backgroundColor: theme.surface,
+    backgroundColor: '#f5f5f5',
   },
   colorPreview: {
     width: 20,
@@ -340,20 +417,20 @@ const createStyles = (theme) => StyleSheet.create({
     borderRadius: 10,
     marginRight: 15,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: '#e5e5e5',
   },
   governorateItemText: {
     flex: 1,
     fontSize: 18,
-    color: theme.text,
+    color: '#1a1a1a',
   },
   selectedGovernorateItemText: {
     fontWeight: 'bold',
-    color: theme.primary,
+    color: '#5C2633',
   },
   checkmark: {
     fontSize: 18,
-    color: theme.primary,
+    color: '#5C2633',
     fontWeight: 'bold',
   },
 }); 
