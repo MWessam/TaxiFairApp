@@ -5,24 +5,49 @@ import locationService from '../services/locationService';
 export default function LocationPermissionRequest() {
   const [locationStatus, setLocationStatus] = useState('not_requested');
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
+    // Initialize location service if not already done
+    const initLocationService = async () => {
+      if (!isInitialized) {
+        await locationService.initialize();
+        setIsInitialized(true);
+      }
+    };
+    
+    initLocationService();
+    
     // Subscribe to location service updates
     const unsubscribe = locationService.subscribe(({ location, status }) => {
+      console.log('LocationPermissionRequest: Status update:', status, 'Location:', location);
       setCurrentLocation(location);
       setLocationStatus(status);
     });
 
     return unsubscribe;
-  }, []);
+  }, [isInitialized]);
 
   const requestPermission = async () => {
+    console.log('LocationPermissionRequest: Requesting permission...');
     await locationService.requestLocationPermission();
   };
 
-  // Don't show anything if location is already granted
-  if (locationStatus === 'granted') {
+  // Don't show anything if location is already granted and we have a location
+  if (locationStatus === 'granted' && currentLocation) {
+    console.log('LocationPermissionRequest: Location granted and available, hiding component');
     return null;
+  }
+
+  // Show loading state while initializing
+  if (!isInitialized) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>🔄 جاري تهيئة خدمة الموقع...</Text>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -54,6 +79,13 @@ export default function LocationPermissionRequest() {
           <TouchableOpacity style={styles.requestButton} onPress={requestPermission}>
             <Text style={styles.requestButtonText}>منح الإذن</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Debug info in development */}
+      {__DEV__ && (
+        <View style={styles.debugContainer}>
+          <Text style={styles.debugText}>Debug: Status={locationStatus}, Location={currentLocation ? 'Available' : 'None'}</Text>
         </View>
       )}
     </View>
@@ -138,5 +170,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  debugContainer: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
   },
 }); 

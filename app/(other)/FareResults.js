@@ -43,11 +43,40 @@ export default function FareResults() {
     setLoadingAnalysis(true);
     try {
       const tripData = JSON.parse(params.tripData);
-      const analysis = await analyzeSimilarTrips(tripData);
+      // have them both run in parallel
+      let [analysis] = await Promise.all([
+        analyzeSimilarTrips(tripData).then(data => ({...data, loading: false})),
+        // estimateFare(tripData).then(data => ({...data, loading: false}))
+      ]);
+      
+      // Check if analysis was successful and has data
+      if (analysis && analysis.success && analysis.data) {
+        if (analysis.data.estimatedFare) {
+          console.log('Estimated fare:', analysis.data.estimatedFare);
+        } else {
+          console.log('No estimated fare in data');
+        }
+        console.log(analysis);
+      } else {
+        console.log('Analysis failed or returned no data:', analysis);
+        // Create a fallback structure
+        analysis = {
+          success: false,
+          data: {
+            estimatedFare: 0,
+            similarTripsCount: 0,
+            averageFare: 0,
+            fareRange: { min: 0, max: 0 }
+          }
+        };
+      }
       setAnalysisData(analysis);
+      // setEstimatedFare(estimatedFare);
     } catch (error) {
       console.error('Error loading analysis:', error);
     } finally {
+      console.log('Loading analysis finished');
+      console.log(analysis);
       setLoadingAnalysis(false);
     }
   };
@@ -151,6 +180,7 @@ export default function FareResults() {
         timeBasedData: [],
         weeklyData: [],
         averageFare: 0,
+        estimatedFare: 0,
         fareRange: { min: 0, max: 0 }
       };
     }
@@ -165,6 +195,7 @@ export default function FareResults() {
         timeBasedData: [],
         weeklyData: [],
         averageFare: 0,
+        estimatedFare: 0,
         fareRange: { min: 0, max: 0 }
       };
     }
@@ -233,6 +264,7 @@ export default function FareResults() {
       timeBasedData: transformTimeBasedData(data.timeBasedAverage),
       weeklyData: transformDayBasedData(data.dayBasedAverage),
       averageFare: data.averageFare || 45,
+      estimatedFare: data.estimatedFare || 0,
       fareRange: data.fareRange || { min: 25, max: 65 }
     };
   };
@@ -286,7 +318,19 @@ export default function FareResults() {
             <View style={styles.fareIconContainer}>
               <Ionicons name="cash" size={48} color={theme.primary} />
               <Text style={styles.fareLabel}>السعر المقترح</Text>
-              <Text style={styles.estimatedFare}>{params.estimate || 45} جنيه</Text>
+              {loadingAnalysis && (
+                <ActivityIndicator size="small" color={theme.primary} />
+              )}
+              {!loadingAnalysis && analysisData && analysisData.data && (
+                analysisData.data.estimatedFare && analysisData.data.estimatedFare !== 0 ?
+                <Text style={styles.estimatedFare}>
+                  {analysisData.data.estimatedFare} جنيه
+                </Text>
+                :
+                <Text style={styles.estimatedFareNotFound}>
+                  لا توجد رحلات او بيانات كافية لتحليل رحلتك
+                </Text>
+              )}
             </View>
 
             {showResults && paidFare ? (
@@ -384,7 +428,7 @@ export default function FareResults() {
         {!loadingAnalysis && (
           <>
             {/* Data Source Info */}
-            {analysisData && analysisData.success && analysisData.data.similarTripsCount > 0 && (
+            {analysisData && analysisData.success && analysisData.data && analysisData.data.similarTripsCount > 0 && (
               <View style={styles.card}>
                 <View style={styles.cardContent}>
                   <View style={styles.infoContainer}>
@@ -557,6 +601,12 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: 48,
     fontWeight: 'bold',
     color: theme.primary,
+  },
+  estimatedFareNotFound: {
+    fontSize: 16,
+    color: theme.primary,
+    marginTop: 8,
+    marginBottom: 8,
   },
   successContainer: {
     backgroundColor: '#F0F9F0',

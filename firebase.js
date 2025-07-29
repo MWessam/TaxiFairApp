@@ -4,19 +4,30 @@ import { getFirestore } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { initializeAuth, getReactNativePersistence, signInAnonymously } from "firebase/auth";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { initializeAppCheck, ReCaptchaV3Provider, getAppCheck } from 'firebase/app-check';
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+// Firebase configuration from environment (see app.config.js -> extra)
+const {
+  FIREBASE_API_KEY,
+  FIREBASE_AUTH_DOMAIN,
+  FIREBASE_PROJECT_ID,
+  FIREBASE_STORAGE_BUCKET,
+  FIREBASE_MESSAGING_SENDER_ID,
+  FIREBASE_APP_ID,
+  FIREBASE_MEASUREMENT_ID
+} = Constants.expoConfig?.extra ?? {};
+
 const firebaseConfig = {
-  apiKey: "AIzaSyCbper0-iKwOENPt0nI5ZyMt7AFmUyDs8M",
-  authDomain: "taxifare-7fe53.firebaseapp.com",
-  projectId: "taxifare-7fe53",
-  storageBucket: "taxifare-7fe53.firebasestorage.app",
-  messagingSenderId: "916645906844",
-  appId: "1:916645906844:web:dfa3981f2cae5d1404a059",
-  measurementId: "G-L16C58LBTF"
+  apiKey: FIREBASE_API_KEY,
+  authDomain: FIREBASE_AUTH_DOMAIN,
+  projectId: FIREBASE_PROJECT_ID,
+  storageBucket: FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: FIREBASE_MESSAGING_SENDER_ID,
+  appId: FIREBASE_APP_ID,
+  measurementId: FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
@@ -47,3 +58,20 @@ export const signInUserAnonymously = async () => {
     return null;
   }
 };
+
+// Initialize Firebase App Check (web / Expo web). For native Expo, further setup may be required.
+try {
+  if (typeof window !== 'undefined' && !getAppCheck(app)) {
+    const siteKey = Constants.expoConfig.extra?.APP_CHECK_SITE_KEY;
+    if (siteKey) {
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(siteKey),
+        isTokenAutoRefreshEnabled: true
+      });
+    } else {
+      console.warn('⚠️ APP_CHECK_SITE_KEY not set; App Check not initialized');
+    }
+  }
+} catch (err) {
+  console.warn('App Check initialization failed:', err);
+}

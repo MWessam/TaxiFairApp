@@ -7,6 +7,7 @@ import { useTheme } from '@/constants/ThemeContext';
 import { getAvailableGovernorates } from '@/constants/Colors';
 import { configureMapbox } from '@/mapboxProvider';
 import LocationPermissionRequest from '../../components/LocationPermissionRequest';
+import locationService from '../../services/locationService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -21,6 +22,18 @@ export default function Home() {
 
   useEffect(() => {
     configureMapbox();
+    
+    // Ensure location service is initialized
+    const initLocationService = async () => {
+      if (!locationService.isInitialized) {
+        console.log('Home: Initializing location service...');
+        await locationService.initialize();
+        console.log('Home: Location service initialized');
+      }
+    };
+    
+    initLocationService();
+    
     // Ensure router is ready
     if (router) {
       routerRef.current = router;
@@ -123,7 +136,7 @@ export default function Home() {
           <Animated.View style={{ transform: [{ scale: buttonScale3 }] }}>
             <TouchableOpacity 
               style={styles.mainTrackButton} 
-              onPress={() => animateButton(buttonScale3, () => routerRef.current?.push('/(tabs)/TrackRide'))}
+              onPress={() => animateButton(buttonScale3, () => routerRef.current?.push('/(other)/TrackRide'))}
               activeOpacity={0.95}
               delayPressIn={0}
               delayPressOut={0}
@@ -138,7 +151,7 @@ export default function Home() {
             <Animated.View style={[styles.secondaryButtonContainer, { transform: [{ scale: buttonScale1 }] }]}>
               <TouchableOpacity 
                 style={styles.secondaryButton} 
-                onPress={() => animateButton(buttonScale1, () => routerRef.current?.push('/(tabs)/SubmitTrip'))}
+                onPress={() => animateButton(buttonScale1, () => routerRef.current?.push('/(other)/SubmitTrip'))}
                 activeOpacity={0.95}
                 delayPressIn={0}
                 delayPressOut={0}
@@ -151,7 +164,7 @@ export default function Home() {
             <Animated.View style={[styles.secondaryButtonContainer, { transform: [{ scale: buttonScale2 }] }]}>
               <TouchableOpacity 
                 style={styles.secondaryButton} 
-                onPress={() => animateButton(buttonScale2, () => routerRef.current?.push('/(tabs)/SubmitTrip?mode=estimate'))}
+                onPress={() => animateButton(buttonScale2, () => routerRef.current?.push('/(other)/SubmitTrip?mode=estimate'))}
                 activeOpacity={0.95}
                 delayPressIn={0}
                 delayPressOut={0}

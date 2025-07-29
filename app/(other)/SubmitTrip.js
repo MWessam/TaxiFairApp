@@ -15,8 +15,6 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
   const router = useRouter();
   const routeParams = useLocalSearchParams();
   
-  // Merge route params with navigation params (for estimate mode) - memoized to prevent infinite loops
-  const params = useMemo(() => ({ ...routeParams, ...navigationParams }), [routeParams, navigationParams]);
   const { theme } = useTheme();
 
   const [from, setFrom] = useState({ address: '', lat: null, lng: null });
@@ -31,11 +29,49 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
   const [currentLocation, setCurrentLocation] = useState(null);
   const cameraRef = useRef();
 
-  const isEstimateMode = mode === 'estimate';
+  // Clean and merge parameters properly
+  const cleanRouteParams = useMemo(() => {
+    const cleaned = {};
+    
+    // Handle mode parameter - it might be an array due to corruption
+    if (routeParams.mode) {
+      if (Array.isArray(routeParams.mode)) {
+        // Take the first element and clean it
+        const modeStr = routeParams.mode[0] || routeParams.mode[1] || '';
+        cleaned.mode = modeStr.split('?')[0]; // Remove any query params that got attached
+      } else {
+        cleaned.mode = routeParams.mode.split('?')[0]; // Remove any query params
+      }
+    }
+    
+    // Clean other parameters
+    Object.keys(routeParams).forEach(key => {
+      if (key !== 'mode') {
+        cleaned[key] = routeParams[key];
+      }
+    });
+    
+    return cleaned;
+  }, [routeParams]);
+
+  // Merge with navigation params
+  const params = useMemo(() => ({ ...cleanRouteParams, ...navigationParams }), [cleanRouteParams, navigationParams]);
+
+  // Determine mode from cleaned params or prop
+  const isEstimateMode = (cleanRouteParams.mode === 'estimate') || mode === 'estimate';
+  
+  console.log('SubmitTrip: Mode detection:', { 
+    routeMode: cleanRouteParams.mode, 
+    propMode: mode, 
+    isEstimateMode,
+    allRouteParams: cleanRouteParams
+  });
 
   // Update from/to if coming back from PlacePicker
   useEffect(() => {
-    console.log('TripForm params updated:', params); // Debug log
+    // console.log('TripForm params updated:', params); // Debug log
+    // console.log('TripForm: All route params:', routeParams); // Debug log
+    // console.log('TripForm: Mode from route:', routeParams.mode); // Debug log
     
     if (params.from_name && params.from_lat && params.from_lng) {
       const fromData = { 
@@ -213,14 +249,14 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
 
   const handleNavigateToPlacePicker = (type) => {
     const coords = type === 'from' ? { lat: from.lat, lng: from.lng } : { lat: to.lat, lng: to.lng };
-    const returnTo = isEstimateMode ? '/(tabs)/SubmitTrip?mode=estimate' : '/(tabs)/SubmitTrip';
     
     // Pass current location data to preserve existing selections
     const pickerParams = { 
       type, 
       lat: coords.lat, 
       lng: coords.lng, 
-      returnTo
+      returnTo: '/(other)/SubmitTrip', // Just the pathname, no query params
+      mode: isEstimateMode ? 'estimate' : 'submit' // Pass the mode parameter
     };
     
     // Add current from location data
@@ -251,7 +287,10 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
             <Ionicons name="arrow-forward" size={20} color={theme.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>

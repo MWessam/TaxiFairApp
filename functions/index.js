@@ -1,24 +1,15 @@
 const { onCall } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
+const crypto = require('crypto');
+const { tripSchema } = require('./schema');
 
 admin.initializeApp();
 
 const db = admin.firestore();
 
-// Bot protection and rate limiting
-const rateLimitMap = new Map();
+// Bot protection and rate limiting (Firestore-backed)
 const MAX_SUBMISSIONS_PER_HOUR = 5;
 const MAX_SUBMISSIONS_PER_DAY = 50;
-
-// Clean up rate limit map every hour
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, timestamp] of rateLimitMap.entries()) {
-    if (now - timestamp > 3600000) { // 1 hour
-      rateLimitMap.delete(key);
-    }
-  }
-}, 3600000);
 
 // Validate trip data feasibility
 function validateTripFeasibility(tripData) {
@@ -109,45 +100,71 @@ function validateTripFeasibility(tripData) {
   return errors;
 }
 
-// Rate limiting function
-function checkRateLimit(identifier) {
+async function checkRateLimit(identifier) {
   const now = Date.now();
-  const hourKey = `${identifier}_${Math.floor(now / 3600000)}`;
-  const dayKey = `${identifier}_${Math.floor(now / 86400000)}`;
-  
-  const hourCount = rateLimitMap.get(hourKey) || 0;
-  const dayCount = rateLimitMap.get(dayKey) || 0;
-  
-  if (hourCount >= MAX_SUBMISSIONS_PER_HOUR) {
-    throw new Error('Too many submissions this hour. Please wait.');
-  }
-  
-  if (dayCount >= MAX_SUBMISSIONS_PER_DAY) {
-    throw new Error('Too many submissions today. Please try again tomorrow.');
-  }
-  
-  rateLimitMap.set(hourKey, hourCount + 1);
-  rateLimitMap.set(dayKey, dayCount + 1);
+  const hourSlot = Math.floor(now / 3600000);
+  const daySlot = Math.floor(now / 86400000);
+
+  const docRef = db.collection('rate_limits').doc(identifier);
+
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(docRef);
+    const data = snap.exists ? snap.data() : {};
+
+    let {
+      hourSlot: storedHourSlot = hourSlot,
+      hourCount = 0,
+      daySlot: storedDaySlot = daySlot,
+      dayCount = 0
+    } = data;
+
+    // Reset counters if we moved into new time windows
+    if (storedHourSlot !== hourSlot) {
+      hourCount = 0;
+      storedHourSlot = hourSlot;
+    }
+    if (storedDaySlot !== daySlot) {
+      dayCount = 0;
+      storedDaySlot = daySlot;
+    }
+
+    if (hourCount >= MAX_SUBMISSIONS_PER_HOUR) {
+      throw new Error('Too many submissions this hour. Please wait.');
+    }
+    if (dayCount >= MAX_SUBMISSIONS_PER_DAY) {
+      throw new Error('Too many submissions today. Please try again tomorrow.');
+    }
+
+    hourCount += 1;
+    dayCount += 1;
+
+    tx.set(docRef, {
+      hourSlot: storedHourSlot,
+      hourCount,
+      daySlot: storedDaySlot,
+      dayCount,
+      // Firestore TTL (configure in console) – doc expires after 2 days
+      expiresAt: admin.firestore.Timestamp.fromMillis(now + 2 * 24 * 60 * 60 * 1000)
+    }, { merge: true });
+  });
 }
 
 // Secure trip submission with validation
-exports.submitTrip = onCall(async (request) => {
+exports.submitTrip = onCall({}, async (request) => {
   const { data } = request;
   const context = request.auth;
   try {
-    // For now, allow unauthenticated requests (you can enable auth later)
-    // if (!context) {
-    //   throw new Error('Authentication required');
-    // }
+    // No user authentication required – function protected by rate limiting only.
     
     // Rate limiting based on IP address for now
     const identifier = context ? context.uid : request.ip;
-    checkRateLimit(identifier);
+    await checkRateLimit(identifier);
     
-    // Validate trip data
-    const validationErrors = validateTripFeasibility(data);
-    if (validationErrors.length > 0) {
-      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    // Validate trip data using Zod schema
+    const parseResult = tripSchema.safeParse(data);
+    if (!parseResult.success) {
+      const errors = parseResult.error.issues.map(i => i.message);
+      throw new Error(`Validation failed: ${errors.join(', ')}`);
     }
     
     // Add metadata
@@ -155,7 +172,7 @@ exports.submitTrip = onCall(async (request) => {
       ...data,
       user_id: context ? context.uid : 'anonymous',
       submitted_at: admin.firestore.FieldValue.serverTimestamp(),
-      ip_address: request.ip || 'unknown',
+      ip_address: hashIp(request.ip),
       user_agent: request.headers?.['user-agent'] || 'unknown'
     };
     
@@ -178,19 +195,22 @@ exports.submitTrip = onCall(async (request) => {
 });
 
 // Secure trip analysis (no direct data access)
-exports.analyzeSimilarTrips = onCall(async (request) => {
+exports.analyzeSimilarTrips = onCall({}, async (request) => {
   const { data } = request;
   const context = request.auth;
   
-  console.log('=== analyzeSimilarTrips DEBUG START ===');
-  console.log('Request data:', JSON.stringify(data, null, 2));
-  console.log('Context:', context ? 'Authenticated' : 'Unauthenticated');
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('=== analyzeSimilarTrips DEBUG START ===');
+  }
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('Request data:', JSON.stringify(data, null, 2));
+  }
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('Context:', context ? 'Authenticated' : 'Unauthenticated');
+  }
   
   try {
-    // For now, allow unauthenticated requests (you can enable auth later)
-    // if (!context) {
-    //   throw new Error('Authentication required');
-    // }
+    // No user authentication required – function protected by rate limiting only.
     
     const { 
       fromLat, 
@@ -205,24 +225,32 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
       maxDistanceDiff = 2
     } = data;
 
-    console.log('Extracted parameters:', {
-      fromLat, fromLng, toLat, toLng, distance, startTime, governorate,
-      maxDistance, maxTimeDiff, maxDistanceDiff
-    });
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Extracted parameters:', {
+        fromLat, fromLng, toLat, toLng, distance, startTime, governorate,
+        maxDistance, maxTimeDiff, maxDistanceDiff
+      });
+    }
 
     // Validate input parameters
     if (!distance || distance <= 0 || distance > 100) {
-      console.log('Distance validation failed:', { distance });
+      if (process.env.DEBUG_LOGS === 'true') {
+        console.log('Distance validation failed:', { distance });
+      }
       throw new Error('Invalid distance parameter');
     }
     
     if (fromLat && (fromLat < 22 || fromLat > 32)) {
-      console.log('Start latitude validation failed:', { fromLat });
+      if (process.env.DEBUG_LOGS === 'true') {
+        console.log('Start latitude validation failed:', { fromLat });
+      }
       throw new Error('Invalid start latitude');
     }
     
     if (toLat && (toLat < 22 || toLat > 32)) {
-      console.log('End latitude validation failed:', { toLat });
+      if (process.env.DEBUG_LOGS === 'true') {
+        console.log('End latitude validation failed:', { toLat });
+      }
       throw new Error('Invalid end latitude');
     }
 
@@ -234,24 +262,28 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
     const timeRangeEnd = new Date(startDate);
     timeRangeEnd.setHours(hour + maxTimeDiff, 59, 59, 999);
 
-    console.log('Time calculations:', {
-      startTime,
-      startDate: startDate.toISOString(),
-      hour,
-      timeRangeStart: timeRangeStart.toISOString(),
-      timeRangeEnd: timeRangeEnd.toISOString()
-    });
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Time calculations:', {
+        startTime,
+        startDate: startDate.toISOString(),
+        hour,
+        timeRangeStart: timeRangeStart.toISOString(),
+        timeRangeEnd: timeRangeEnd.toISOString()
+      });
+    }
 
     // Calculate distance range
     const distanceRangeStart = Math.max(0, distance - maxDistanceDiff);
     const distanceRangeEnd = distance + maxDistanceDiff;
 
-    console.log('Distance range calculations:', {
-      distance,
-      maxDistanceDiff,
-      distanceRangeStart,
-      distanceRangeEnd
-    });
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Distance range calculations:', {
+        distance,
+        maxDistanceDiff,
+        distanceRangeStart,
+        distanceRangeEnd
+      });
+    }
 
     // Query for similar trips (server-side only)
     let tripsQuery = db.collection('trips')
@@ -259,24 +291,36 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
       .where('distance', '<=', distanceRangeEnd)
       .where('fare', '>', 0);
 
-    console.log('Base query created with filters:', {
-      distanceRangeStart,
-      distanceRangeEnd,
-      fareFilter: '> 0'
-    });
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Base query created with filters:', {
+        distanceRangeStart,
+        distanceRangeEnd,
+        fareFilter: '> 0'
+      });
+    }
 
     // If governorate is available, filter by it
     if (governorate) {
       tripsQuery = tripsQuery.where('governorate', '==', governorate);
-      console.log('Added governorate filter:', governorate);
+      if (process.env.DEBUG_LOGS === 'true') {
+        console.log('Added governorate filter:', governorate);
+      }
     }
 
-    console.log('Executing Firestore query...');
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Executing Firestore query...');
+    }
     const snapshot = await tripsQuery.limit(100).get();
-    console.log('Query executed. Results count:', snapshot.size);
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Query executed. Results count:', snapshot.size);
+    }
+    // Estimate fare via google vertex ai ml model
+    // const estimatedFare = await estimateFare(snapshot.docs.map(doc => doc.data()));
 
     if (snapshot.empty) {
-      console.log('No trips found in query results');
+      if (process.env.DEBUG_LOGS === 'true') {
+        console.log('No trips found in query results');
+      }
       return {
         success: true,
         data: {
@@ -287,12 +331,15 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
           dayBasedAverage: { sunday: { count: 0, avg: 0 }, monday: { count: 0, avg: 0 }, tuesday: { count: 0, avg: 0 }, wednesday: { count: 0, avg: 0 }, thursday: { count: 0, avg: 0 }, friday: { count: 0, avg: 0 }, saturday: { count: 0, avg: 0 } },
           distanceBasedAverage: { short: { count: 0, avg: 0 }, medium: { count: 0, avg: 0 }, long: { count: 0, avg: 0 } },
           fareDistribution: [],
-          recentTrips: []
+          recentTrips: [],
+          estimatedFare: 0
         }
       };
     }
 
-    console.log('Processing', snapshot.size, 'trips from query results');
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Processing', snapshot.size, 'trips from query results');
+    }
     
     const trips = [];
     snapshot.forEach(doc => {
@@ -303,26 +350,32 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
       });
     });
     
-    console.log('Sample trip data (first 2):', trips.slice(0, 2).map(trip => ({
-      id: trip.id,
-      distance: trip.distance,
-      fare: trip.fare,
-      from: trip.from,
-      to: trip.to,
-      start_time: trip.start_time
-    })));
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Sample trip data (first 2):', trips.slice(0, 2).map(trip => ({
+        id: trip.id,
+        distance: trip.distance,
+        fare: trip.fare,
+        from: trip.from,
+        to: trip.to,
+        start_time: trip.start_time
+      })));
+    }
 
     // Filter by geographic proximity (if coordinates are provided)
     let filteredTrips = trips;
     if (fromLat && fromLng && toLat && toLng) {
-      console.log('Filtering by geographic proximity with coordinates:', {
-        fromLat, fromLng, toLat, toLng, maxDistance
-      });
+      if (process.env.DEBUG_LOGS === 'true') {
+        console.log('Filtering by geographic proximity with coordinates:', {
+          fromLat, fromLng, toLat, toLng, maxDistance
+        });
+      }
       
       const originalCount = trips.length;
       filteredTrips = trips.filter(trip => {
         if (!trip.from?.lat || !trip.from?.lng || !trip.to?.lat || !trip.to?.lng) {
-          console.log('Trip missing coordinates:', trip.id);
+          if (process.env.DEBUG_LOGS === 'true') {
+            console.log('Trip missing coordinates:', trip.id);
+          }
           return false;
         }
         
@@ -331,44 +384,63 @@ exports.analyzeSimilarTrips = onCall(async (request) => {
         const isWithinRange = fromDistance <= maxDistance && toDistance <= maxDistance;
         
         if (!isWithinRange) {
-          console.log('Trip outside geographic range:', {
-            tripId: trip.id,
-            fromDistance: Math.round(fromDistance * 100) / 100,
-            toDistance: Math.round(toDistance * 100) / 100,
-            maxDistance
-          });
+          if (process.env.DEBUG_LOGS === 'true') {
+            console.log('Trip outside geographic range:', {
+              tripId: trip.id,
+              fromDistance: Math.round(fromDistance * 100) / 100,
+              toDistance: Math.round(toDistance * 100) / 100,
+              maxDistance
+            });
+          }
         }
         
         return isWithinRange;
       });
       
-      console.log('Geographic filtering results:', {
-        originalCount,
-        filteredCount: filteredTrips.length,
-        removedCount: originalCount - filteredTrips.length
-      });
+      if (process.env.DEBUG_LOGS === 'true') {
+        console.log('Geographic filtering results:', {
+          originalCount,
+          filteredCount: filteredTrips.length,
+          removedCount: originalCount - filteredTrips.length
+        });
+      }
     } else {
-      console.log('No geographic filtering applied - missing coordinates');
+      if (process.env.DEBUG_LOGS === 'true') {
+        console.log('No geographic filtering applied - missing coordinates');
+      }
     }
 
-    console.log('Final trips count for analysis:', filteredTrips.length);
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Final trips count for analysis:', filteredTrips.length);
+    }
     
     // Calculate statistics (same logic as before)
     const analysis = calculateTripStatistics(filteredTrips);
     
-    console.log('Analysis completed successfully');
-    console.log('=== analyzeSimilarTrips DEBUG END ===');
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Analysis completed successfully');
+    }
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('=== analyzeSimilarTrips DEBUG END ===');
+    }
     
     return {
       success: true,
-      data: analysis
+      data: {
+        ...analysis,
+        estimatedFare: Math.round(estimatedFare * 100) / 100
+      }
     };
 
   } catch (error) {
-    console.error('=== analyzeSimilarTrips ERROR ===');
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.error('=== analyzeSimilarTrips ERROR ===');
+    }
     console.error('Error analyzing similar trips:', error);
     console.error('Error stack:', error.stack);
-    console.error('=== analyzeSimilarTrips ERROR END ===');
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.error('=== analyzeSimilarTrips ERROR END ===');
+    }
     return {
       success: false,
       error: error.message
@@ -389,13 +461,34 @@ function calculateDistance(lat1, lng1, lat2, lng2) {
   return R * c;
 }
 
+async function estimateFare(trips) {
+  // TODO: Implement ML model for fare estimation
+  // For now, return a simple average
+  if (!trips || trips.length === 0) {
+    return 0;
+  }
+  
+  const fares = trips.map(trip => trip.fare).filter(fare => fare > 0);
+  if (fares.length === 0) {
+    return 0;
+  }
+  
+  return fares.reduce((a, b) => a + b, 0) / fares.length;
+}
+
 // Calculate trip statistics (same as before)
 function calculateTripStatistics(trips) {
-  console.log('=== calculateTripStatistics DEBUG START ===');
-  console.log('Processing', trips.length, 'trips for statistics');
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('=== calculateTripStatistics DEBUG START ===');
+  }
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('Processing', trips.length, 'trips for statistics');
+  }
   
   if (trips.length === 0) {
-    console.log('No trips to analyze, returning empty statistics');
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('No trips to analyze, returning empty statistics');
+    }
     return {
       similarTripsCount: 0,
       averageFare: 0,
@@ -410,11 +503,13 @@ function calculateTripStatistics(trips) {
 
   // Calculate basic statistics
   const fares = trips.map(trip => trip.fare).filter(fare => fare > 0);
-  console.log('Fare statistics:', {
-    totalTrips: trips.length,
-    tripsWithValidFares: fares.length,
-    fareRange: fares.length > 0 ? { min: Math.min(...fares), max: Math.max(...fares) } : 'No valid fares'
-  });
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('Fare statistics:', {
+      totalTrips: trips.length,
+      tripsWithValidFares: fares.length,
+      fareRange: fares.length > 0 ? { min: Math.min(...fares), max: Math.max(...fares) } : 'No valid fares'
+    });
+  }
   
   const averageFare = fares.length > 0 ? fares.reduce((a, b) => a + b, 0) / fares.length : 0;
   const fareRange = {
@@ -422,7 +517,9 @@ function calculateTripStatistics(trips) {
     max: fares.length > 0 ? Math.max(...fares) : 0
   };
   
-  console.log('Calculated fare statistics:', { averageFare, fareRange });
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('Calculated fare statistics:', { averageFare, fareRange });
+  }
 
   // Group by time periods
   const timeGroups = {
@@ -474,11 +571,13 @@ function calculateTripStatistics(trips) {
     }
   });
   
-  console.log('Time-based grouping:', {
-    tripsWithStartTime,
-    tripsWithoutStartTime: trips.length - tripsWithStartTime,
-    timeGroups
-  });
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('Time-based grouping:', {
+      tripsWithStartTime,
+      tripsWithoutStartTime: trips.length - tripsWithStartTime,
+      timeGroups
+    });
+  }
 
   // Calculate averages
   Object.keys(timeGroups).forEach(key => {
@@ -550,12 +649,16 @@ function calculateTripStatistics(trips) {
     recentTrips
   };
   
-  console.log('Final analysis result:', {
-    similarTripsCount: result.similarTripsCount,
-    averageFare: result.averageFare,
-    recentTripsCount: result.recentTrips.length
-  });
-  console.log('=== calculateTripStatistics DEBUG END ===');
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('Final analysis result:', {
+      similarTripsCount: result.similarTripsCount,
+      averageFare: result.averageFare,
+      recentTripsCount: result.recentTrips.length
+    });
+  }
+  if (process.env.DEBUG_LOGS === 'true') {
+    console.log('=== calculateTripStatistics DEBUG END ===');
+  }
   
   return result;
 }
@@ -585,4 +688,9 @@ function createFareDistribution(fares) {
     count,
     percentage: Math.round((count / fares.length) * 100)
   }));
+} 
+
+function hashIp(ip) {
+  if (!ip) return 'unknown';
+  return crypto.createHash('sha256').update(ip).digest('hex');
 } 

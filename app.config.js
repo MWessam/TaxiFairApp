@@ -68,7 +68,16 @@ export default {
       "eas": {
         "projectId": "9f03bc33-b757-410d-90c9-1d5d4c61d73b"
       },
-      "MAPBOX_ACCESS_TOKEN": process.env.MAPBOX_ACCESS_TOKEN
+      "MAPBOX_ACCESS_TOKEN": process.env.MAPBOX_ACCESS_TOKEN,
+      "ORS_API_KEY": process.env.ORS_API_KEY,
+      "FIREBASE_API_KEY": process.env.FIREBASE_API_KEY,
+      "FIREBASE_AUTH_DOMAIN": process.env.FIREBASE_AUTH_DOMAIN,
+      "FIREBASE_PROJECT_ID": process.env.FIREBASE_PROJECT_ID,
+      "FIREBASE_STORAGE_BUCKET": process.env.FIREBASE_STORAGE_BUCKET,
+      "FIREBASE_MESSAGING_SENDER_ID": process.env.FIREBASE_MESSAGING_SENDER_ID,
+      "FIREBASE_APP_ID": process.env.FIREBASE_APP_ID,
+      "FIREBASE_MEASUREMENT_ID": process.env.FIREBASE_MEASUREMENT_ID,
+      "APP_CHECK_SITE_KEY": process.env.APP_CHECK_SITE_KEY
     }
   }
 }

@@ -1,15 +1,10 @@
 // firestoreHelpers.js
-import { functions, signInUserAnonymously } from './firebase';
+import { functions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
 
 export async function saveTrip(tripData) {
   try {
-    // Try to authenticate, but continue if it fails
-    try {
-      await signInUserAnonymously();
-    } catch (authError) {
-      console.log('Authentication failed, continuing without auth...');
-    }
+    // No authentication – rely on App Check only
     
     // Call the secure Firebase Function
     const submitTrip = httpsCallable(functions, 'submitTrip');
@@ -29,12 +24,7 @@ export async function saveTrip(tripData) {
 
 export async function analyzeSimilarTrips(tripData) {
   try {
-    // Try to authenticate, but continue if it fails
-    try {
-      await signInUserAnonymously();
-    } catch (authError) {
-      console.log('Authentication failed, continuing without auth...');
-    }
+    // No authentication – rely on App Check only
     
     // Call the secure Firebase Function
     const analyzeTrips = httpsCallable(functions, 'analyzeSimilarTrips');

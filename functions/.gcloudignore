@@ -1,0 +1,6 @@
+# Files to exclude from Cloud Functions deployment
+
+debug-analyze.js
+*.test.js
+.env
+.env.* 

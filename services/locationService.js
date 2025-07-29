@@ -6,16 +6,67 @@ class LocationService {
     this.currentLocation = null;
     this.locationStatus = 'not_requested'; // 'not_requested', 'requesting', 'granted', 'denied'
     this.listeners = [];
+    this._isInitialized = false;
+  }
+
+  // Initialize location service (call this at app startup)
+  async initialize() {
+    if (this._isInitialized) return;
+    
+    try {
+      console.log('Initializing location service...');
+      
+      // Check if we already have permission
+      const { status } = await Location.getForegroundPermissionsAsync();
+      console.log('Current permission status:', status);
+      
+      if (status === 'granted') {
+        this.locationStatus = 'granted';
+        this.notifyListeners();
+        
+        // Try to get current location
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 5000,
+            distanceInterval: 5,
+          });
+          
+          this.currentLocation = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+          
+          console.log('Initial location obtained:', this.currentLocation);
+          this.notifyListeners();
+        } catch (error) {
+          console.log('Could not get initial location:', error);
+          // Even if we can't get location immediately, permission is granted
+          this.notifyListeners();
+        }
+      } else {
+        this.locationStatus = 'not_requested';
+        this.notifyListeners();
+      }
+      
+      this._isInitialized = true;
+    } catch (error) {
+      console.error('Error initializing location service:', error);
+      this.locationStatus = 'denied';
+      this.notifyListeners();
+    }
   }
 
   // Request location permission and get current location
   async requestLocationPermission() {
     try {
+      console.log('Requesting location permission...');
       this.locationStatus = 'requesting';
       this.notifyListeners();
 
       // Request precise location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('Permission request result:', status);
       
       if (status === 'granted') {
         // Get current location with high accuracy
@@ -67,6 +118,11 @@ class LocationService {
   // Get location status
   getLocationStatus() {
     return this.locationStatus;
+  }
+
+  // Check if service is initialized
+  get isInitialized() {
+    return this._isInitialized;
   }
 
   // Check if location is available
@@ -123,35 +179,6 @@ class LocationService {
         status: this.locationStatus
       });
     });
-  }
-
-  // Initialize location service (call this at app startup)
-  async initialize() {
-    // Check if we already have permission
-    const { status } = await Location.getForegroundPermissionsAsync();
-    
-    if (status === 'granted') {
-      this.locationStatus = 'granted';
-      // Try to get current location
-      try {
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 5000,
-          distanceInterval: 5,
-        });
-        
-        this.currentLocation = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        };
-      } catch (error) {
-        console.log('Could not get initial location:', error);
-      }
-    } else {
-      this.locationStatus = 'not_requested';
-    }
-    
-    this.notifyListeners();
   }
 }
 

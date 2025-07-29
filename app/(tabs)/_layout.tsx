@@ -33,20 +33,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => <TabBarIcon name="home" color={color} focused={focused} />,
         }}
       />
-      <Tabs.Screen
-        name="SubmitTrip"
-        options={{
-          title: 'شارك رحلتك',
-          tabBarIcon: ({ color, focused }) => <TabBarIcon name="car" color={color} focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="TrackRide"
-        options={{
-          title: 'تتبع الرحلة',
-          tabBarIcon: ({ color, focused }) => <TabBarIcon name="location" color={color} focused={focused} />,
-        }}
-      />
     </Tabs>
   );
 }
@@ -59,8 +45,6 @@ function TabBarIcon({ name, color, focused }: { name: string; color: string; foc
       transform: [{ scale: focused ? 1.1 : 1 }],
     }}>
       {name === 'home' && '🏠'}
-      {name === 'car' && '🚗'}
-      {name === 'location' && '📍'}
     </Text>
   );
 } 

@@ -155,14 +155,20 @@ export default function PlacePicker() {
       }
     }
 
+    // Preserve the mode parameter if it exists
+    if (params.mode) {
+      navigationParams.mode = params.mode;
+    }
+
     // Navigate back with the selected location
     router.back();
+    // Use setTimeout to ensure the navigation happens after the current render cycle
     setTimeout(() => {
       router.replace({
-        pathname: params.returnTo || '/(tabs)/SubmitTrip',
+        pathname: '/(other)/SubmitTrip',
         params: navigationParams,
       });
-    }, 100);
+    }, 50);
   };
 
   // Handle favorite location selection

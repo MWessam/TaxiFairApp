@@ -1,10 +1,16 @@
 // routeHelpers.js
 // Helper functions for route distance calculations and geocoding
 
+import Constants from 'expo-constants';
+
 // Calculates driving distance between two points using OpenRouteService
 export async function getRouteDistanceORS(start, end, getGeometry = false) {
-  const apiKey = 'eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImRkZGE0M2MyYWVmNDRkYzFiYWRmMzMyN2IzMzhmMzMxIiwiaCI6Im11cm11cjY0In0='; // <-- Replace with your real key!
-  const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${apiKey}&start=${start.lng},${start.lat}&end=${end.lng},${end.lat}`;
+  const ORS_API_KEY = Constants.expoConfig.extra?.ORS_API_KEY;
+  if (!ORS_API_KEY) {
+    console.warn('⚠️ ORS_API_KEY not set');
+    return getGeometry ? { distance: null, geometry: [] } : null;
+  }
+  const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${ORS_API_KEY}&start=${start.lng},${start.lat}&end=${end.lng},${end.lat}`;
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error('ORS API error');
@@ -65,10 +71,17 @@ export function distillRoute(route, maxPoints = 20) {
   return result;
 }
 
-const MAPBOX_TOKEN = 'pk.eyJ1IjoibWVkb3dlc3NhbSIsImEiOiJjbWRrNmNoOGMwdjV4MmpxeXRlMWRiZmF2In0.VIllyVMDcPZVM00od5u0yg';
+const MAPBOX_TOKEN = Constants.expoConfig.extra?.MAPBOX_ACCESS_TOKEN;
+if (!MAPBOX_TOKEN) {
+  console.warn('⚠️ MAPBOX_ACCESS_TOKEN not set');
+}
 
 // Gets the governorate/state from coordinates using Mapbox Geocoding API
 export async function getGovernorateFromCoords(lat, lng) {
+  if (!MAPBOX_TOKEN) {
+    console.warn('⚠️ MAPBOX_ACCESS_TOKEN not set, skipping getGovernorateFromCoords');
+    return '';
+  }
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&types=region&language=ar,en`;
   try {
     const res = await fetch(url);
@@ -83,6 +96,10 @@ export async function getGovernorateFromCoords(lat, lng) {
   }
 }
 export async function reverseGeocode(lat, lng){
+  if (!MAPBOX_TOKEN) {
+    console.warn('⚠️ MAPBOX_ACCESS_TOKEN not set, skipping reverseGeocode');
+    return '';
+  }
   try {
     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&language=ar,en`;
     const res = await fetch(url);
@@ -97,6 +114,10 @@ export async function reverseGeocode(lat, lng){
 
 // Gets the full address name from coordinates using Mapbox Geocoding API
 export async function getAddressFromCoords(lat, lng) {
+  if (!MAPBOX_TOKEN) {
+    console.warn('⚠️ MAPBOX_ACCESS_TOKEN not set, skipping getAddressFromCoords');
+    return '';
+  }
   const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&language=ar,en`;
   try {
     const res = await fetch(url);
@@ -111,6 +132,10 @@ export async function getAddressFromCoords(lat, lng) {
 
 // Search places using Mapbox Geocoding API
 export async function searchPlacesMapbox(query, currentLocation = null) {
+  if (!MAPBOX_TOKEN) {
+    console.warn('⚠️ MAPBOX_ACCESS_TOKEN not set, skipping searchPlacesMapbox');
+    return [];
+  }
   try {
     let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&language=ar,en&limit=10&types=poi,place,address&country=EG`;
     
