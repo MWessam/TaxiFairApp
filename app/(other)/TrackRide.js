@@ -318,6 +318,39 @@ export default function TrackRide() {
   // Mock tracking functions
   const startMockTracking = async () => {
     console.log('Starting mock tracking');
+    
+    // First, get current location
+    if (!locationService.isInitialized) {
+      console.log('Location service not initialized, initializing now...');
+      await locationService.initialize();
+    }
+    
+    const location = await locationService.requestLocationPermission();
+    if (!location) {
+      console.log('Location permission denied or failed');
+      Alert.alert('Permission Required', 'Please enable location permissions to start mock tracking.');
+      return;
+    }
+    
+    console.log('Current location for mock tracking:', location);
+    
+    // Generate mock route from current location to Talkha
+    const startLat = location.latitude;
+    const startLng = location.longitude;
+    const endLat = 31.5000; // Talkha
+    const endLng = 31.8440; // Talkha
+    
+    // Create a route with 100 points from current location to Talkha
+    const mockRouteFromCurrent = [];
+    const totalPoints = 100;
+    
+    for (let i = 0; i <= totalPoints; i++) {
+      const progress = i / totalPoints;
+      const lat = startLat + (endLat - startLat) * progress;
+      const lng = startLng + (endLng - startLng) * progress;
+      mockRouteFromCurrent.push({ latitude: lat, longitude: lng });
+    }
+    
     setIsMockMode(true);
     setIsTracking(true);
     setHasStarted(true);
@@ -328,14 +361,20 @@ export default function TrackRide() {
     
     // Start mock tracking with interval
     let currentIndex = 0;
+    console.log('Starting mock tracking with route:', mockRouteFromCurrent.length, 'points');
+    console.log('Start location:', mockRouteFromCurrent[0]);
+    console.log('End location:', mockRouteFromCurrent[mockRouteFromCurrent.length - 1]);
+    
     const interval = setInterval(() => {
-      if (currentIndex < mockRoute.length) {
-        const newRoute = mockRoute.slice(0, currentIndex + 1);
+      if (currentIndex < mockRouteFromCurrent.length) {
+        const newRoute = mockRouteFromCurrent.slice(0, currentIndex + 1);
         setRoute(newRoute);
-        setCurrentLocation(mockRoute[currentIndex]);
+        setCurrentLocation(mockRouteFromCurrent[currentIndex]);
+        console.log(`Mock tracking: point ${currentIndex + 1}/${mockRouteFromCurrent.length}`, mockRouteFromCurrent[currentIndex]);
         currentIndex++;
       } else {
         // Route completed
+        console.log('Mock tracking completed');
         clearInterval(interval);
         setMockInterval(null);
       }
@@ -654,7 +693,7 @@ export default function TrackRide() {
 
       {/* Map Area */}
       {isTracking && (
-        <MapboxGL.MapView
+      <MapboxGL.MapView
         style={styles.map}
         scrollEnabled={false}
         zoomEnabled={false}
@@ -662,9 +701,10 @@ export default function TrackRide() {
         pitchEnabled={false}
       >
           <MapboxGL.Camera
-            followUserLocation={true}
+            followUserLocation={isTracking}
             followUserMode='normal'
-            followZoomLevel={16} // Use this prop for zoom level when following
+            followZoomLevel={16}
+            centerCoordinate={currentLocation ? [currentLocation.longitude, currentLocation.latitude] : [31.2357, 30.0444]}
           />
           
           {/* User Location */}
@@ -683,6 +723,14 @@ export default function TrackRide() {
               <MapboxGL.LineLayer id="routeLine" style={{ lineColor: '#5C2633', lineWidth: 4 }} />
             </MapboxGL.ShapeSource>
           )}
+          
+          {/* Debug: Show route info
+          {route.length > 0 && (
+            <View style={styles.debugInfo}>
+              <Text style={styles.debugText}>Route points: {route.length}</Text>
+              <Text style={styles.debugText}>Current: {currentLocation ? `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}` : 'None'}</Text>
+            </View>
+          )} */}
 
           {/* Start Location Pin */}
           {hasStarted && route.length > 0 && (
@@ -694,7 +742,7 @@ export default function TrackRide() {
                 <Text style={styles.startPinText}>📍</Text>
               </View>
             </MapboxGL.PointAnnotation>
-            )}
+          )}
           </MapboxGL.MapView>
       )}
 
@@ -744,14 +792,14 @@ export default function TrackRide() {
                   <Text style={styles.startButtonText}>بدء التتبع</Text>
                 </TouchableOpacity>
                 
-                {/* Mock Tracking Button */}
+                {/* Mock Tracking Button
                 <TouchableOpacity 
                   style={styles.mockButton} 
                   onPress={startMockTracking}
                 >
                   <Text style={styles.mockButtonIcon}>🧪</Text>
-                  <Text style={styles.mockButtonText}>تجربة المسار الوهمي (من المنصورة إلى طلخا)</Text>
-                </TouchableOpacity>
+                  <Text style={styles.mockButtonText}>تجربة المسار الوهمي (من موقعك الحالي إلى طلخا)</Text>
+                </TouchableOpacity> */}
               </View>
             ) : (
               <View style={{ width: '100%', alignItems: 'center' }}>
@@ -1061,5 +1109,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  debugInfo: {
+    position: 'absolute',
+    top: 120,
+    left: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 8,
+    borderRadius: 4,
+  },
+  debugText: {
+    color: 'white',
+    fontSize: 12,
+    fontFamily: 'monospace',
   },
 });
