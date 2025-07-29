@@ -180,13 +180,36 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
           governorate,
           distance,
         };
-        
-        const success = await saveTrip(tripData);
-        if (!success) {
+
+        const response = await saveTrip(tripData);
+        if (!response.success) {
           setLoading(false);
-          Alert.alert('حدث خطأ أثناء حفظ الرحلة');
+          // Alert.alert('حدث خطأ أثناء حفظ الرحلة');
           return;
         }
+        
+        // Navigate to results with status
+        router.push({
+          pathname: '/fare-result',
+          params: {
+            from: fromObj.name,
+            to: toObj.name,
+            from_lat: fromObj.lat,
+            from_lng: fromObj.lng,
+            to_lat: toObj.lat,
+            to_lng: toObj.lng,
+            distance,
+            duration,
+            time: startTime ? startTime.toLocaleTimeString('ar-EG', { 
+              hour: '2-digit', 
+              minute: '2-digit',
+              hour12: true 
+            }) : null,
+            estimate: fare,
+            status: response.status || null,
+            tripData: JSON.stringify(tripData)
+          }
+        });
       }
       
       setLoading(false);
@@ -212,6 +235,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
           estimate,
           distance,
           governorate,
+          status: tripStatus, // pass validation status
           // If in submit mode and fare is provided, pass it
           ...(fare && { paidFare: fare }),
           // Pass mode to FareResults
@@ -228,8 +252,8 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
               passenger_count: passengers ? Number(passengers) : 1,
               governorate,
               distance,
-            })
-          })
+            }),
+          }),
         },
       });
     } catch (err) {

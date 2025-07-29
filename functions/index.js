@@ -39,16 +39,38 @@ const EGYPTIAN_HOLIDAYS = [
   // Add more holidays as needed
 ];
 
-// Tariff validation constants
-const TARIFF_CONFIG = {
-  BASE_FARE: 9, // Base fare in EGP
-  PER_KM_RATE: 2, // Rate per kilometer in EGP
-  MIN_PERCENTAGE_MODIFIER: 0.15, // 15% minimum
-  MAX_PERCENTAGE_MODIFIER: 0.60, // 60% maximum
-  ESTIMATE_PERCENTAGE_MODIFIER: 0.40, // 40% for estimate
-  OUTLIER_MULTIPLIER: 1.5, // For IQR outlier detection
-};
+// --- Helper function for IQR Calculation ---
+// This function calculates the Interquartile Range (IQR) to identify statistical outliers.
+const calculateIQR = (arr) => {
+    // We need at least 4 data points to calculate quartiles meaningfully.
+    if (arr.length < 4) return null;
 
+    const sortedArr = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(sortedArr.length / 2);
+
+    // Split the array into two halves to find Q1 and Q3
+    const q1Arr = sortedArr.slice(0, mid);
+    const q3Arr = sortedArr.length % 2 === 0 ? sortedArr.slice(mid) : sortedArr.slice(mid + 1);
+
+    // Helper to find the median of an array
+    const getMedian = (a) => {
+        const m = Math.floor(a.length / 2);
+        return a.length % 2 === 0 ? (a[m - 1] + a[m]) / 2 : a[m];
+    };
+
+    const q1 = getMedian(q1Arr);
+    const q3 = getMedian(q3Arr);
+    const iqr = q3 - q1;
+
+    // The standard formula for outlier detection using IQR
+    return {
+        q1,
+        q3,
+        iqr,
+        lowerBound: q1 - 1.5 * iqr,
+        upperBound: q3 + 1.5 * iqr,
+    };
+};
 // Zone determination is now handled by zone-manager.js
 
 // Function to extract ML features from trip data
@@ -208,6 +230,50 @@ async function checkRateLimit(identifier) {
   });
 }
 
+function getSimilarTripsQuery(fromZone, toZone) {
+  let query = db.collection('trips')
+    .where('from_zone', '==', fromZone)
+    .where('to_zone', '==', toZone)
+    .where('suspicious', '==', false)
+    .orderBy('submitted_at', 'desc')
+    .limit(200);
+  return query;
+}
+
+async function isFareWithinSimilarRange(tripData, mlFeatures) {
+  if (!mlFeatures.from_zone || !mlFeatures.to_zone) {
+    return false; // Cannot compare without zones
+  }
+
+  const snapshot = await getSimilarTripsQuery(mlFeatures.from_zone, mlFeatures.to_zone).get();
+  if (snapshot.empty) return false;
+
+  // Collect fares and additional filtering on distance/time if provided
+  const fares = [];
+  snapshot.forEach(doc => {
+    const d = doc.data();
+    // Optional coarse filtering
+    if (tripData.distance && d.distance) {
+      const pctDiff = Math.abs(d.distance - tripData.distance) / tripData.distance;
+      if (pctDiff > 0.2) return; // Filter out trips with distance diff >20%
+    }
+    if (tripData.start_time && d.start_time) {
+      const ourHour = new Date(tripData.start_time).getHours();
+      const theirHour = new Date(d.start_time).getHours();
+      if (Math.abs(ourHour - theirHour) > 2) return; // ±2 hours window
+    }
+    fares.push(d.fare);
+  });
+
+  // Need at least 4 data points for IQR method
+  if (fares.length < 4) return false;
+
+  const iqrStats = calculateIQR(fares);
+  if (!iqrStats) return false;
+
+  return tripData.fare >= iqrStats.lowerBound && tripData.fare <= iqrStats.upperBound;
+}
+
 // Secure trip submission with validation
 exports.submitTrip = onCall({
   memory: '512MiB',
@@ -234,7 +300,31 @@ exports.submitTrip = onCall({
     
     // Extract ML features from the trip data
     const mlFeatures = extractMLFeatures(data);
-    
+
+    // --- Official tariff validation ---
+    const officialFare = OFFICIAL_TARIFF.BASE_FARE + OFFICIAL_TARIFF.PER_KM * data.distance;
+    const minAllowedFare = officialFare * (1 + OFFICIAL_TARIFF.MIN_PERCENT_MODIFIER);
+    const maxAllowedFare = officialFare * (1 + OFFICIAL_TARIFF.MAX_PERCENT_MODIFIER);
+
+    let validationStatus = 'accepted';
+    let suspicious = false;
+    if (data.fare < minAllowedFare) {
+      validationStatus = 'below_min_fare';
+      suspicious = true;
+    } else if (data.fare > maxAllowedFare) {
+      validationStatus = 'above_max_fare';
+      suspicious = true;
+    }
+
+    if (validationStatus !== 'accepted') {
+      // Attempt fallback using similar trips statistics
+      const withinSimilar = await isFareWithinSimilarRange(data, mlFeatures);
+      if (withinSimilar) {
+        validationStatus = 'accepted';
+        suspicious = false; // No longer suspicious if passes similarity check
+      }
+    }
+
     // Add metadata and ML features
     const tripData = {
       ...data,
@@ -242,16 +332,26 @@ exports.submitTrip = onCall({
       user_id: context ? context.uid : 'anonymous',
       submitted_at: admin.firestore.FieldValue.serverTimestamp(),
       ip_address: hashIp(request.ip),
-      user_agent: request.headers?.['user-agent'] || 'unknown'
+      user_agent: request.headers?.['user-agent'] || 'unknown',
+      suspicious,
+      validation_status: validationStatus,
+      official_fare: officialFare,
+      min_allowed_fare: minAllowedFare,
+      max_allowed_fare: maxAllowedFare
     };
-    
-    // Save to Firestore
+
+    // Save to Firestore regardless, but mark suspicious if needed
     const docRef = await db.collection('trips').add(tripData);
-    
+
     return {
       success: true,
+      status: validationStatus,
       trip_id: docRef.id,
-      message: 'Trip submitted successfully',
+      message: validationStatus === 'accepted'
+        ? 'Trip submitted successfully'
+        : (validationStatus === 'below_min_fare'
+            ? 'Fare below allowed minimum'
+            : 'Fare above allowed maximum'),
       ml_features: mlFeatures // Return ML features for debugging
     };
     

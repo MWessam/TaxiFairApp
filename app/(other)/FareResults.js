@@ -18,6 +18,7 @@ export default function FareResults() {
   const [inputValue, setInputValue] = useState(params.paidFare || '');
   const [saving, setSaving] = useState(false);
   const [analysisData, setAnalysisData] = useState(null);
+  const [validationStatus, setValidationStatus] = useState(params.status || null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [addingToFavorites, setAddingToFavorites] = useState(false);
 
@@ -32,6 +33,13 @@ export default function FareResults() {
       setInputValue(params.paidFare);
     }
   }, [params.paidFare, params.from, params.to, params.estimate]);
+
+  // Update validation status when params change
+  useEffect(() => {
+    if (params.status) {
+      setValidationStatus(params.status);
+    }
+  }, [params.status]);
 
   // Load analysis data when component mounts
   useEffect(() => {
@@ -95,15 +103,12 @@ export default function FareResults() {
         // Update the trip data with the paid fare
         tripData.fare = Number(inputValue);
         
-        const success = await saveTrip(tripData);
-        if (success) {
-          Alert.alert('شكراً!', 'تم حفظ الرحلة بنجاح');
-        } else {
-          Alert.alert('خطأ', 'حدث خطأ أثناء حفظ الرحلة');
+        const response = await saveTrip(tripData);
+        if (response && response.status) {
+          setValidationStatus(response.status);
         }
       } catch (error) {
         console.error('Error saving trip:', error);
-        Alert.alert('خطأ', 'حدث خطأ أثناء حفظ الرحلة');
       } finally {
         setSaving(false);
       }
@@ -344,6 +349,13 @@ export default function FareResults() {
             {showResults && paidFare ? (
               <View style={styles.successContainer}>
                 <Text style={styles.successText}>دفعت: {paidFare} جنيه</Text>
+                // Split it either u paid more or u paid less
+                {validationStatus === 'below_min_fare' && (
+                  <Text style={styles.warningText}>تحذير: دفعت أقل مما يدفعه الناس عادة</Text>
+                )}
+                {validationStatus === 'above_max_fare' && (
+                  <Text style={styles.warningText}>تحذير: دفعت أكثر مما يدفعه الناس عادة</Text>
+                )}
                 <Text style={styles.successSubtext}>شكراً لمساهمتك في تحسين الخدمة</Text>
               </View>
             ) : (
@@ -630,7 +642,13 @@ const createStyles = (theme) => StyleSheet.create({
   },
   successSubtext: {
     fontSize: 14,
-    color: '#388E3C',
+    color: theme.textSecondary,
+    marginTop: 4,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#FFC107', // yellow
+    marginTop: 4,
   },
   inputContainer: {
     gap: 12,

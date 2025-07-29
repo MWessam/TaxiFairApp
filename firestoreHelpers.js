@@ -10,15 +10,10 @@ export async function saveTrip(tripData) {
     const submitTrip = httpsCallable(functions, 'submitTrip');
     const result = await submitTrip(tripData);
     
-    if (result.data.success) {
-      return true;
-    } else {
-      console.error('Trip submission failed:', result.data.error);
-      return false;
-    }
+    return result.data; // Forward full response { success, status, ... }
   } catch (error) {
     console.error('Error saving trip:', error);
-    return false;
+    return { success: false, error: error.message };
   }
 }
 
