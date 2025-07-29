@@ -13,13 +13,7 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: currentGovData?.primary || '#007AFF',
-          borderTopWidth: 0,
-          elevation: 0,
-          shadowOpacity: 0,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          display: 'none',
         },
         tabBarActiveTintColor: '#FFFFFF',
         tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.7)',
@@ -30,7 +24,7 @@ export default function TabLayout() {
         },
         tabBarIconStyle: {
           marginBottom: 2,
-        },
+        }
       }}>
       <Tabs.Screen
         name="index"

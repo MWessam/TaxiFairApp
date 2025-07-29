@@ -49,18 +49,20 @@ export default function Home() {
 
   const animateButton = (buttonScale, callback) => {
     Animated.sequence([
-      Animated.timing(buttonScale, {
-        toValue: 0.95,
-        duration: 100,
+      Animated.spring(buttonScale, {
+        toValue: 0.92,
+        tension: 400,
+        friction: 8,
         useNativeDriver: true,
       }),
-      Animated.timing(buttonScale, {
+      Animated.spring(buttonScale, {
         toValue: 1,
-        duration: 100,
+        tension: 400,
+        friction: 6,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Use routerRef.current to ensure we always have the latest router
+      // Immediate navigation for snappy feel
       if (routerRef.current) {
         callback();
       } else {
@@ -69,7 +71,7 @@ export default function Home() {
           if (routerRef.current) {
             callback();
           }
-        }, 100);
+        }, 50);
       }
     });
   };
@@ -91,7 +93,7 @@ export default function Home() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.mainContent}>
           {/* Theme Selector Card */}
-          <View style={styles.themeCard}>
+          {/* <View style={styles.themeCard}>
             <View style={styles.themeCardHeader}>
               <Text style={styles.themeCardIcon}>🎨</Text>
               <Text style={styles.themeCardTitle}>اختر محافظتك</Text>
@@ -117,14 +119,16 @@ export default function Home() {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
+          </View> */}
 
           {/* Main Track Ride Button */}
           <Animated.View style={{ transform: [{ scale: buttonScale3 }] }}>
             <TouchableOpacity 
               style={styles.mainTrackButton} 
               onPress={() => animateButton(buttonScale3, () => routerRef.current?.push('/(tabs)/TrackRide'))}
-              activeOpacity={0.8}
+              activeOpacity={0.95}
+              delayPressIn={0}
+              delayPressOut={0}
             >
               <Text style={styles.mainTrackButtonIcon}>📍</Text>
               <Text style={styles.mainTrackButtonText}>تتبع الرحلة</Text>
@@ -133,22 +137,26 @@ export default function Home() {
 
           {/* Secondary Buttons Grid */}
           <View style={styles.secondaryButtonsGrid}>
-            <Animated.View style={{ transform: [{ scale: buttonScale1 }] }}>
+            <Animated.View style={[styles.secondaryButtonContainer, { transform: [{ scale: buttonScale1 }] }]}>
               <TouchableOpacity 
                 style={styles.secondaryButton} 
                 onPress={() => animateButton(buttonScale1, () => routerRef.current?.push('/(tabs)/SubmitTrip'))}
-                activeOpacity={0.8}
+                activeOpacity={0.95}
+                delayPressIn={0}
+                delayPressOut={0}
               >
                 <Text style={styles.secondaryButtonIcon}>➕</Text>
                 <Text style={styles.secondaryButtonText}>إضافة رحلة</Text>
               </TouchableOpacity>
             </Animated.View>
 
-            <Animated.View style={{ transform: [{ scale: buttonScale2 }] }}>
+            <Animated.View style={[styles.secondaryButtonContainer, { transform: [{ scale: buttonScale2 }] }]}>
               <TouchableOpacity 
                 style={styles.secondaryButton} 
                 onPress={() => animateButton(buttonScale2, () => routerRef.current?.push('/(tabs)/SubmitTrip?mode=estimate'))}
-                activeOpacity={0.8}
+                activeOpacity={0.95}
+                delayPressIn={0}
+                delayPressOut={0}
               >
                 <Text style={styles.secondaryButtonIcon}>💰</Text>
                 <Text style={styles.secondaryButtonText}>تقدير السعر</Text>
@@ -240,11 +248,12 @@ const createStyles = (theme) => StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    justifyContent: 'center',
   },
   mainContent: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 20,
+    justifyContent: 'center',
   },
   themeCard: {
     backgroundColor: 'white',
@@ -319,11 +328,11 @@ const createStyles = (theme) => StyleSheet.create({
     shadowColor: '#5C2633',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   mainTrackButtonIcon: {
     fontSize: 24,
@@ -339,16 +348,27 @@ const createStyles = (theme) => StyleSheet.create({
     gap: 16,
     marginBottom: 40,
   },
-  secondaryButton: {
+  secondaryButtonContainer: {
     flex: 1,
-    height: 56,
+  },
+  secondaryButton: {
+    width: '100%',
+    height: 64, // Match the height of the main track button
     borderWidth: 2,
     borderColor: '#5C2633',
-    borderRadius: 12,
+    borderRadius: 16, // Match the border radius of the main track button
     backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#5C2633',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   secondaryButtonIcon: {
     fontSize: 20,

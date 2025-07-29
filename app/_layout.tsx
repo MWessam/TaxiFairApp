@@ -71,10 +71,11 @@ export default function RootLayout() {
           <Stack
             screenOptions={{
               headerShown: false,
-              // Add smooth transitions
+              // Improved smooth transitions
               animation: 'slide_from_right',
-              animationDuration: 300,
-              // Add gesture handling
+              animationDuration: 250, // Shorter for snappier feel
+              animationTypeForReplace: 'push',
+              // Enhanced gesture handling
               gestureEnabled: true,
               gestureDirection: 'horizontal',
             }}>
