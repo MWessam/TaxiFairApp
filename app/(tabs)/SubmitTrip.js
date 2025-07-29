@@ -476,6 +476,7 @@ const createStyles = (theme) => StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    transform: [{ rotate: '180deg' }],
   },
   headerTitle: {
     fontSize: 18,

@@ -21,8 +21,8 @@ export default function PlacePicker() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showMap, setShowMap] = useState(false);
-  const [mapPin, setMapPin] = useState({ latitude: 30.0444, longitude: 31.2357 });
-  const [pinAddress, setPinAddress] = useState('ميدان التحرير، القاهرة');
+  const [mapPin, setMapPin] = useState(null);
+  const [pinAddress, setPinAddress] = useState('جاري تحديد الموقع...');
   const [currentLocation, setCurrentLocation] = useState(null);
   const debounceRef = useRef();
   const mapRef = useRef();
@@ -36,16 +36,44 @@ export default function PlacePicker() {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status === 'granted' && isMounted) {
-          let loc = await Location.getCurrentPositionAsync({});
+          let loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.High,
+            timeInterval: 5000,
+          });
           if (isMounted) {
-            setCurrentLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-            setMapPin({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            const currentCoords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+            console.log('Initial location:', currentCoords); // Debug log
+            
+            // Validate coordinates are not at (0,0) or invalid
+            if (currentCoords.latitude === 0 && currentCoords.longitude === 0) {
+              console.log('Invalid coordinates detected, using fallback');
+              const fallbackCoords = { latitude: 30.0444, longitude: 31.2357 };
+              setCurrentLocation(fallbackCoords);
+              setMapPin(fallbackCoords);
+              setPinAddress('ميدان التحرير، القاهرة');
+              return;
+            }
+            
+            setCurrentLocation(currentCoords);
+            setMapPin(currentCoords);
+            // Update pin address for current location
+            try {
+              const address = await reverseGeocode(currentCoords.latitude, currentCoords.longitude);
+              setPinAddress(address || 'موقعك الحالي');
+            } catch (err) {
+              setPinAddress('موقعك الحالي');
+            }
           }
         } else {
           Alert.alert('يرجى السماح للتطبيق بالوصول إلى الموقع');
         }
       } catch (error) {
         console.log('Location error:', error);
+        // Fallback to Cairo if location fails
+        const fallbackCoords = { latitude: 30.0444, longitude: 31.2357 };
+        setCurrentLocation(fallbackCoords);
+        setMapPin(fallbackCoords);
+        setPinAddress('ميدان التحرير، القاهرة');
       }
     })();
 
@@ -188,24 +216,61 @@ export default function PlacePicker() {
   };
 
   // Map logic
-  const openMap = () => {
-    setShowMap(true);
+  const openMap = async () => {
+    try {
+      // Always get fresh location when opening map
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        let loc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+          timeInterval: 5000,
+        });
+        const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+        console.log('Current location:', coords); // Debug log
+        
+        // Validate coordinates are not at (0,0) or invalid
+        if (coords.latitude === 0 && coords.longitude === 0) {
+          Alert.alert('خطأ', 'لا يمكن تحديد موقعك الحالي. يرجى المحاولة مرة أخرى.');
+          return;
+        }
+        
+        setCurrentLocation(coords);
+        setMapPin(coords);
+        setShowMap(true);
+      } else {
+        Alert.alert('يرجى السماح للتطبيق بالوصول إلى الموقع');
+      }
+    } catch (error) {
+      console.log('Location error:', error);
+      Alert.alert('خطأ', 'لا يمكن الحصول على موقعك الحالي');
+    }
   };
 
   // When map pin moves, reverse geocode
   React.useEffect(() => {
-    if (showMap) {
-      reverseGeocode(mapPin.latitude, mapPin.longitude).then(address => {
-        setPinAddress(address || 'موقع غير محدد');
-      }).catch(err => {
-        console.error('Reverse geocoding error:', err);
-        setPinAddress('موقع غير محدد');
-      });
+    if (showMap && mapPin && mapPin.latitude && mapPin.longitude && mapPin.latitude !== 0 && mapPin.longitude !== 0) {
+      // Debounce the reverse geocoding to avoid too many API calls
+      const timeoutId = setTimeout(() => {
+        console.log('Reverse geocoding for:', mapPin); // Debug log
+        reverseGeocode(mapPin.latitude, mapPin.longitude).then(address => {
+          setPinAddress(address || 'موقع غير محدد');
+        }).catch(err => {
+          console.error('Reverse geocoding error:', err);
+          setPinAddress('موقع غير محدد');
+        });
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [mapPin.latitude, mapPin.longitude, showMap]);
+  }, [mapPin?.latitude, mapPin?.longitude, showMap]);
 
   // Handle picking from map
   const handleMapLocationSelect = () => {
+    if (!mapPin || !mapPin.latitude || !mapPin.longitude) {
+      Alert.alert('خطأ', 'يرجى اختيار موقع صحيح من الخريطة');
+      return;
+    }
+    
     const loc = {
       name: pinAddress,
       lat: mapPin.latitude,
@@ -219,8 +284,18 @@ export default function PlacePicker() {
   // Handle getting current location
   const handleCurrentLocation = async () => {
     try {
-      const location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        timeInterval: 5000,
+      });
       const newPin = { latitude: location.coords.latitude, longitude: location.coords.longitude };
+      
+      // Validate coordinates
+      if (newPin.latitude === 0 && newPin.longitude === 0) {
+        Alert.alert('خطأ', 'لا يمكن تحديد موقعك الحالي. يرجى المحاولة مرة أخرى.');
+        return;
+      }
+      
       setMapPin(newPin);
       
       if (cameraRef.current) {
@@ -235,15 +310,16 @@ export default function PlacePicker() {
     }
   };
 
-  useEffect(() => {
-    if (cameraRef.current && mapPin && showMap) {
-      cameraRef.current.setCamera({
-        centerCoordinate: [mapPin.longitude, mapPin.latitude],
-        zoomLevel: 14,
-        animationDuration: 1000,
-      });
-    }
-  }, [showMap]);
+  // useEffect(() => {
+  //   if (cameraRef.current && mapPin && mapPin.latitude && mapPin.longitude && showMap) {
+  //     console.log('Setting camera to:', mapPin); // Debug log
+  //     cameraRef.current.setCamera({
+  //       centerCoordinate: [mapPin.longitude, mapPin.latitude],
+  //       zoomLevel: 16,
+  //       animationDuration: 500,
+  //     });
+  //   }
+  // }, [showMap, mapPin]);
 
   const styles = createStyles(theme);
   const headerTitle = type === 'from' ? 'اختر نقطة البداية' : 'اختر الوجهة';
@@ -257,21 +333,27 @@ export default function PlacePicker() {
             style={styles.map}
             onRegionDidChange={async () => {
               try {
-                if (mapRef.current) {
-                  const center = await mapRef.current.getCenter();
-                  if (center && center.length === 2) {
-                    setMapPin({ latitude: center[1], longitude: center[0] });
-                  }
-                }
+                const [lng, lat] = await mapRef.current.getCenter();
+                console.log('Map center changed to:', { lat, lng }); // Debug log
+                setMapPin({ latitude: lat, longitude: lng });
               } catch (error) {
                 console.log('Map region change error:', error);
               }
             }}
           >
-            <MapboxGL.Camera ref={cameraRef} />
             {currentLocation && (
-              <MapboxGL.UserLocation 
-                visible={true} 
+              <MapboxGL.Camera
+                ref={cameraRef}
+                centerCoordinate={[currentLocation.longitude, currentLocation.latitude]}
+                zoomLevel={16}
+                animationDuration={0}
+                animationType="none"
+              />
+            )}
+
+            {currentLocation && (
+              <MapboxGL.UserLocation
+                visible={true}
                 showsUserHeadingIndicator={true}
               />
             )}
@@ -299,7 +381,7 @@ export default function PlacePicker() {
                 {pinAddress}
               </Text>
               <Text style={styles.mapLocationSubtitle}>حرك الخريطة لاختيار المكان</Text>
-              
+
               <View style={styles.mapButtonsRow}>
                 <TouchableOpacity style={styles.mapCancelButton} onPress={() => setShowMap(false)}>
                   <Text style={styles.mapCancelButtonText}>إلغاء</Text>
@@ -321,7 +403,7 @@ export default function PlacePicker() {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-forward" size={20} color={theme.text} />
+            <Ionicons name="arrow-forward" size={20} color={theme.text} style = {styles.backButtonIcon}/>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{headerTitle}</Text>
           <View style={styles.headerSpacer} />
@@ -464,6 +546,9 @@ const createStyles = (theme) => StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  backButtonIcon: {
+    transform: [{ rotate: '180deg' }],
   },
   headerTitle: {
     fontSize: 18,
@@ -634,8 +719,14 @@ const createStyles = (theme) => StyleSheet.create({
     transform: [{ translateX: -16 }, { translateY: -32 }],
     zIndex: 10,
     alignItems: 'center',
+    pointerEvents: 'none',
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
   },
   pinLabel: {
+    display: 'none',
+    width: '100%',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
     paddingVertical: 4,

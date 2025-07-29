@@ -13,6 +13,7 @@ import {
   clearTrackingData 
 } from '../../services/backgroundTracking';
 import locationService from '../../services/locationService';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,6 +26,15 @@ export default function TrackRide() {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [passengers, setPassengers] = useState('');
+  const [backgroundPermissionGranted, setBackgroundPermissionGranted] = useState(false);
+  
+  // Check background permission status
+  const checkBackgroundPermission = async () => {
+    const { status } = await Location.getBackgroundPermissionsAsync();
+    setBackgroundPermissionGranted(status === 'granted');
+    return status === 'granted';
+  };
+  
   // This function loads the tracked route from storage and updates the map
   const loadRouteFromStorage = async () => {
     const trackingData = await getCurrentTrackingData();
@@ -48,6 +58,8 @@ export default function TrackRide() {
         }
       };
       
+      // Check background permission status when screen loads
+      checkBackgroundPermission();
       checkTrackingStatus();
 
       // Set up a listener to update the route on the map in real-time
@@ -80,13 +92,50 @@ export default function TrackRide() {
     }
     console.log('Location permission granted');
 
-    // Request background permission
-    const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+    // Check background permission status
+    const { status: backgroundStatus } = await Location.getBackgroundPermissionsAsync();
+    
     if (backgroundStatus !== 'granted') {
-      Alert.alert('Permission Required', 'Please enable background location permissions to track your ride when the app is closed.');
+      // Show informative alert about background permissions
+      Alert.alert(
+        'Background Location Required',
+        'To track your ride even when the app is closed, background location access is required. This allows the app to continue tracking your location in the background.',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Enable',
+            onPress: async () => {
+              // Request background permission
+              const { status: newBackgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+              if (newBackgroundStatus === 'granted') {
+                console.log('Background permission granted');
+                // Continue with tracking after permission is granted
+                await continueWithTracking(location);
+              } else {
+                Alert.alert(
+                  'Permission Denied',
+                  'Background location access is required to track your ride. Please enable it in your device settings.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Open Settings', onPress: () => Location.openSettings() }
+                  ]
+                );
+              }
+            },
+          },
+        ]
+      );
       return;
     }
+    
     console.log('Background permission granted');
+    await continueWithTracking(location);
+  };
+
+  const continueWithTracking = async (location) => {
     
     // Clear any existing tracking data
     await clearTrackingData();
@@ -206,7 +255,7 @@ export default function TrackRide() {
           style={styles.backButton} 
           onPress={() => router.back()}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <Ionicons name="arrow-forward" size={20} style = {styles.backButtonIcon}/>
         </TouchableOpacity>
         <View style={styles.headerTitle}>
           <Text style={styles.headerTitleText}>تتبع الرحلة</Text>
@@ -265,9 +314,19 @@ export default function TrackRide() {
         <View style={styles.bottomCard}>
           <View style={styles.bottomContent}>
             {!hasStarted ? (
-              <View>
+              // It should be centered and all elements should extend to their full width
+              <View style = {styles.startContainer}>
                 <Text style={styles.startTitle}>ابدأ تتبع رحلتك</Text>
                 <Text style={styles.startSubtitle}>اضغط على "بدء التتبع" لتسجيل رحلتك</Text>
+                
+                {/* Background Permission Status */}
+                {!backgroundPermissionGranted && (
+                  <View style={styles.permissionWarning}>
+                    <Text style={styles.permissionWarningText}>
+                      ⚠️ Background location access is required for ride tracking
+                    </Text>
+                  </View>
+                )}
                 
                 <TextInput
                   style={styles.passengerInput}
@@ -278,13 +337,20 @@ export default function TrackRide() {
                   onChangeText={setPassengers}
                 />
                 
-                <TouchableOpacity style={styles.startButton} onPress={startTracking}>
+                <TouchableOpacity 
+                  style={[
+                    styles.startButton, 
+                    !backgroundPermissionGranted && styles.startButtonDisabled
+                  ]} 
+                  onPress={startTracking}
+                  disabled={!backgroundPermissionGranted}
+                >
                   <Text style={styles.startButtonIcon}>▶️</Text>
                   <Text style={styles.startButtonText}>بدء التتبع</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <View>
+              <View style={{ width: '100%', alignItems: 'center' }}>
                 <View style={styles.trackingStatus}>
                   <Text style={styles.trackingTitle}>
                     {isTracking ? "جاري التتبع..." : "تم إيقاف التتبع"}
@@ -336,14 +402,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 40,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  backButtonText: {
-    fontSize: 18,
+  backButtonIcon: {
+    transform: [{ rotate: '180deg' }],
     color: '#5C2633',
   },
   headerTitle: {
@@ -425,6 +494,7 @@ const styles = StyleSheet.create({
   bottomContent: {
     padding: 24,
     alignItems: 'center',
+    width: '100%',
   },
   startTitle: {
     fontSize: 18,
@@ -432,12 +502,14 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 8,
     textAlign: 'center',
+    width: '100%',
   },
   startSubtitle: {
     fontSize: 14,
     color: '#666666',
     marginBottom: 20,
     textAlign: 'center',
+    width: '100%',
   },
   passengerInput: {
     backgroundColor: '#f5f5f5',
@@ -446,18 +518,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 16,
     color: '#1a1a1a',
-    width: '100%',
     textAlign: 'center',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   startButton: {
     backgroundColor: '#5C2633',
     borderRadius: 12,
     paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+    alignSelf: 'stretch',
   },
   startButtonIcon: {
     fontSize: 20,
@@ -471,6 +545,7 @@ const styles = StyleSheet.create({
   trackingStatus: {
     marginBottom: 20,
     alignItems: 'center',
+    width: '100%',
   },
   trackingTitle: {
     fontSize: 24,
@@ -522,5 +597,31 @@ const styles = StyleSheet.create({
   },
   loading: {
     marginTop: 16,
+  },
+  permissionWarning: {
+    backgroundColor: '#fef3c7',
+    borderWidth: 1,
+    borderColor: '#f59e0b',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  permissionWarningText: {
+    fontSize: 14,
+    color: '#92400e',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  startButtonDisabled: {
+    backgroundColor: '#9ca3af',
+    opacity: 0.6,
+  },
+  startContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
   },
 });

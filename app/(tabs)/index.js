@@ -49,16 +49,14 @@ export default function Home() {
 
   const animateButton = (buttonScale, callback) => {
     Animated.sequence([
-      Animated.spring(buttonScale, {
+      Animated.timing(buttonScale, {
         toValue: 0.92,
-        tension: 400,
-        friction: 8,
+        duration: 100,
         useNativeDriver: true,
       }),
-      Animated.spring(buttonScale, {
+      Animated.timing(buttonScale, {
         toValue: 1,
-        tension: 400,
-        friction: 6,
+        duration: 100,
         useNativeDriver: true,
       }),
     ]).start(() => {
@@ -357,7 +355,7 @@ const createStyles = (theme) => StyleSheet.create({
     borderWidth: 2,
     borderColor: '#5C2633',
     borderRadius: 16, // Match the border radius of the main track button
-    backgroundColor: 'transparent',
+    backgroundColor: '#5C2633',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -377,7 +375,10 @@ const createStyles = (theme) => StyleSheet.create({
   secondaryButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#5C2633',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    width: 80,
   },
   footer: {
     alignItems: 'center',
