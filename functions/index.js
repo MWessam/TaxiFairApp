@@ -23,8 +23,12 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Bot protection and rate limiting (Firestore-backed)
-const MAX_SUBMISSIONS_PER_HOUR = 5;
-const MAX_SUBMISSIONS_PER_DAY = 50;
+const MAX_SUBMISSIONS_PER_HOUR = 20;  // More reasonable for mobile app users
+const MAX_SUBMISSIONS_PER_DAY = 100;  // More reasonable for mobile app users
+const OFFICIAL_TARIFF_BASE_FARE = 9;
+const OFFICIAL_TARIFF_PER_KM = 2;
+const OFFICIAL_TARIFF_MIN_PERCENT_MODIFIER = 0.15;
+const OFFICIAL_TARIFF_MAX_PERCENT_MODIFIER = 0.60;
 
 // Zone management is now handled by zone-manager.js
 
@@ -210,10 +214,10 @@ async function checkRateLimit(identifier) {
     }
 
     if (hourCount >= MAX_SUBMISSIONS_PER_HOUR) {
-      throw new Error('Too many submissions this hour. Please wait.');
+      throw new Error(`Rate limit exceeded: ${MAX_SUBMISSIONS_PER_HOUR} submissions per hour. Please wait before submitting more trips.`);
     }
     if (dayCount >= MAX_SUBMISSIONS_PER_DAY) {
-      throw new Error('Too many submissions today. Please try again tomorrow.');
+      throw new Error(`Rate limit exceeded: ${MAX_SUBMISSIONS_PER_DAY} submissions per day. Please try again tomorrow.`);
     }
 
     hourCount += 1;
@@ -284,12 +288,26 @@ exports.submitTrip = onCall({
   try {
     // No user authentication required – function protected by rate limiting only.
     
-    // Rate limiting based on IP address for now
-    const identifier = context ? context.uid : (request.ip || 'unknown');
-    if (!identifier || identifier.trim() === '') {
-      throw new Error('Unable to identify user for rate limiting');
+    // Rate limiting based on device ID, user ID, or IP address
+    let identifier;
+    
+    // Priority order: device_id > user_id > ip_address
+    if (data.device_id && data.device_id.trim() !== '') {
+      identifier = `device_${data.device_id}`;
+    } else if (context && context.uid) {
+      identifier = `user_${context.uid}`;
+    } else if (request.ip) {
+      identifier = `ip_${hashIp(request.ip)}`;
+    } else {
+      identifier = 'unknown';
     }
-    await checkRateLimit(identifier);
+    
+    if (!identifier || identifier === 'unknown') {
+      console.log('Unable to identify user for rate limiting');
+      // throw new Error('Unable to identify user for rate limiting');
+    }
+    
+    //await checkRateLimit(identifier);
     
     // Validate trip data using Zod schema
     const parseResult = tripSchema.safeParse(data);
@@ -302,16 +320,18 @@ exports.submitTrip = onCall({
     const mlFeatures = extractMLFeatures(data);
 
     // --- Official tariff validation ---
-    const officialFare = OFFICIAL_TARIFF.BASE_FARE + OFFICIAL_TARIFF.PER_KM * data.distance;
-    const minAllowedFare = officialFare * (1 + OFFICIAL_TARIFF.MIN_PERCENT_MODIFIER);
-    const maxAllowedFare = officialFare * (1 + OFFICIAL_TARIFF.MAX_PERCENT_MODIFIER);
+    const officialFare = OFFICIAL_TARIFF_BASE_FARE + OFFICIAL_TARIFF_PER_KM * data.distance;
+    const minAllowedFare = officialFare * (1 + OFFICIAL_TARIFF_MIN_PERCENT_MODIFIER);
+    const maxAllowedFare = officialFare * (1 + OFFICIAL_TARIFF_MAX_PERCENT_MODIFIER);
 
     let validationStatus = 'accepted';
     let suspicious = false;
     if (data.fare < minAllowedFare) {
+      console.log('Fare below allowed minimum', data.fare, minAllowedFare);
       validationStatus = 'below_min_fare';
       suspicious = true;
     } else if (data.fare > maxAllowedFare) {
+      console.log('Fare above allowed maximum', data.fare, maxAllowedFare);
       validationStatus = 'above_max_fare';
       suspicious = true;
     }
@@ -333,7 +353,7 @@ exports.submitTrip = onCall({
       submitted_at: admin.firestore.FieldValue.serverTimestamp(),
       ip_address: hashIp(request.ip),
       user_agent: request.headers?.['user-agent'] || 'unknown',
-      suspicious,
+      suspicious: suspicious,
       validation_status: validationStatus,
       official_fare: officialFare,
       min_allowed_fare: minAllowedFare,
@@ -384,6 +404,26 @@ exports.analyzeSimilarTrips = onCall({
   
   try {
     // No user authentication required – function protected by rate limiting only.
+    
+    // Rate limiting based on device ID, user ID, or IP address
+    let identifier;
+    
+    // Priority order: device_id > user_id > ip_address
+    if (data.device_id && data.device_id.trim() !== '') {
+      identifier = `device_${data.device_id}`;
+    } else if (context && context.uid) {
+      identifier = `user_${context.uid}`;
+    } else if (request.ip) {
+      identifier = `ip_${hashIp(request.ip)}`;
+    } else {
+      identifier = 'unknown';
+    }
+    
+    if (!identifier || identifier === 'unknown') {
+      //throw new Error('Unable to identify user for rate limiting');
+    }
+    
+    // await checkRateLimit(identifier);
     
     const { 
       fromLat, 
@@ -463,6 +503,7 @@ exports.analyzeSimilarTrips = onCall({
       .where('distance', '>=', distanceRangeStart)
       .where('distance', '<=', distanceRangeEnd)
       .where('fare', '>', 0);
+      // Note: We'll filter suspicious trips in application logic to include records without suspicious field
 
     if (process.env.DEBUG_LOGS === 'true') {
       console.log('Base query created with filters:', {
@@ -589,6 +630,21 @@ exports.analyzeSimilarTrips = onCall({
       if (process.env.DEBUG_LOGS === 'true') {
         console.log('No geographic filtering applied - missing coordinates');
       }
+    }
+
+    // Filter out suspicious trips (include records without suspicious field)
+    const originalCount = filteredTrips.length;
+    filteredTrips = filteredTrips.filter(trip => {
+      // Include trips where suspicious is false OR doesn't exist
+      return trip.suspicious !== true;
+    });
+    
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Suspicious filtering results:', {
+        originalCount,
+        filteredCount: filteredTrips.length,
+        removedCount: originalCount - filteredTrips.length
+      });
     }
 
     if (process.env.DEBUG_LOGS === 'true') {

@@ -82,7 +82,7 @@ const PremiumUpgradeModal = ({ visible, onClose }) => {
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color={theme.colors.background} />
+                <ActivityIndicator color={theme.background} />
               ) : (
                 <Text style={styles.upgradeButtonText}>ترقية الآن</Text>
               )}
@@ -110,7 +110,7 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
   },
   modalContainer: {
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.background,
     borderRadius: 20,
     padding: 24,
     margin: 20,
@@ -121,7 +121,7 @@ const createStyles = (theme) => StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: theme.colors.text,
+    color: theme.text,
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -132,7 +132,7 @@ const createStyles = (theme) => StyleSheet.create({
   benefitsTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: theme.colors.text,
+    color: theme.text,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -143,7 +143,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   benefitText: {
     fontSize: 16,
-    color: theme.colors.text,
+    color: theme.text,
     textAlign: 'center',
     flex: 1,
   },
@@ -154,12 +154,12 @@ const createStyles = (theme) => StyleSheet.create({
   price: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: theme.primary,
     marginBottom: 4,
   },
   priceDescription: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: theme.textSecondary,
   },
   buttonContainer: {
     width: '100%',
@@ -173,20 +173,20 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'center',
   },
   upgradeButton: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.primary,
   },
   upgradeButtonText: {
-    color: theme.colors.background,
+    color: theme.background,
     fontSize: 18,
     fontWeight: '600',
   },
   cancelButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: theme.border,
   },
   cancelButtonText: {
-    color: theme.colors.text,
+    color: theme.text,
     fontSize: 16,
   },
 });

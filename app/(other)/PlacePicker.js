@@ -23,6 +23,7 @@ export default function PlacePicker() {
   const [showMap, setShowMap] = useState(false);
   const [mapPin, setMapPin] = useState(null);
   const [pinAddress, setPinAddress] = useState('جاري تحديد الموقع...');
+  const [isAddressLoading, setIsAddressLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
   const debounceRef = useRef();
   const mapRef = useRef();
@@ -255,14 +256,20 @@ export default function PlacePicker() {
   // When map pin moves, reverse geocode
   React.useEffect(() => {
     if (showMap && mapPin && mapPin.latitude && mapPin.longitude && mapPin.latitude !== 0 && mapPin.longitude !== 0) {
+      // Set loading state immediately when pin moves
+      setIsAddressLoading(true);
+      setPinAddress('...');
+      
       // Debounce the reverse geocoding to avoid too many API calls
       const timeoutId = setTimeout(() => {
         console.log('Reverse geocoding for:', mapPin); // Debug log
         reverseGeocode(mapPin.latitude, mapPin.longitude).then(address => {
           setPinAddress(address || 'موقع غير محدد');
+          setIsAddressLoading(false);
         }).catch(err => {
           console.error('Reverse geocoding error:', err);
           setPinAddress('موقع غير محدد');
+          setIsAddressLoading(false);
         });
       }, 300);
 
@@ -368,9 +375,9 @@ export default function PlacePicker() {
           {/* Center Pin */}
           <View style={styles.centerPin}>
             <Ionicons name="location" size={32} color={theme.primary} />
-            <View style={styles.pinLabel}>
+            <View style={[styles.pinLabel, isAddressLoading && styles.pinLabelLoading]}>
               <Text style={styles.pinLabelText} numberOfLines={1}>
-                {pinAddress}
+                {isAddressLoading ? '...' : pinAddress}
               </Text>
             </View>
           </View>
@@ -383,10 +390,17 @@ export default function PlacePicker() {
           {/* Bottom Controls */}
           <View style={styles.mapBottomPanel}>
             <View style={styles.mapBottomContent}>
-              <Text style={styles.mapLocationTitle} numberOfLines={2}>
-                {pinAddress}
+              <View style={styles.locationTitleContainer}>
+                <Text style={styles.mapLocationTitle} numberOfLines={2}>
+                  {isAddressLoading ? '...' : pinAddress}
+                </Text>
+                {isAddressLoading && (
+                  <ActivityIndicator size="small" color={theme.primary} style={styles.loadingIndicator} />
+                )}
+              </View>
+              <Text style={styles.mapLocationSubtitle}>
+                {isAddressLoading ? 'جاري تحديد العنوان...' : 'حرك الخريطة لاختيار المكان'}
               </Text>
-              <Text style={styles.mapLocationSubtitle}>حرك الخريطة لاختيار المكان</Text>
 
               <View style={styles.mapButtonsRow}>
                 <TouchableOpacity style={styles.mapCancelButton} onPress={() => setShowMap(false)}>
@@ -745,6 +759,11 @@ const createStyles = (theme) => StyleSheet.create({
     elevation: 3,
     maxWidth: 200,
   },
+  pinLabelLoading: {
+    backgroundColor: '#F0F9FF',
+    borderColor: theme.primary,
+    borderWidth: 1,
+  },
   pinLabelText: {
     fontSize: 12,
     fontWeight: '500',
@@ -784,12 +803,21 @@ const createStyles = (theme) => StyleSheet.create({
   mapBottomContent: {
     padding: 16,
   },
+  locationTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
   mapLocationTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: theme.text,
     textAlign: 'center',
-    marginBottom: 4,
+    flex: 1,
+  },
+  loadingIndicator: {
+    marginLeft: 8,
   },
   mapLocationSubtitle: {
     fontSize: 14,

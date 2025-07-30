@@ -5,72 +5,20 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "distance",
+          "fieldPath": "from_zone",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "fare",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "trips",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "governorate",
+          "fieldPath": "suspicious",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "distance",
+          "fieldPath": "to_zone",
           "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "trips",
-      "queryScope": "COLLECTION",
-      "fields": [
+        },
         {
-          "fieldPath": "start_time",
+          "fieldPath": "submitted_at",
           "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "created_at",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "trips",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "distance",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fare",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "governorate",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "trips",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "distance",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "fare",
-          "order": "ASCENDING"
         }
       ]
     }

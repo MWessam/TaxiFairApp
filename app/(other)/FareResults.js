@@ -37,6 +37,7 @@ export default function FareResults() {
   // Update validation status when params change
   useEffect(() => {
     if (params.status) {
+      console.log('Status:', params.status);
       setValidationStatus(params.status);
     }
   }, [params.status]);
@@ -93,7 +94,6 @@ export default function FareResults() {
   const handlePaidFareSubmit = async () => {
     if (!inputValue) return;
     setPaidFare(inputValue);
-    setShowResults(true);
     
     // If we have trip data and we're in estimate mode, save the trip
     if (params.tripData) {
@@ -105,13 +105,22 @@ export default function FareResults() {
         
         const response = await saveTrip(tripData);
         if (response && response.status) {
+          console.log('Response:', response);
+          console.log('Status:', response.status);
           setValidationStatus(response.status);
+          // Only show results after we get the validation status
+          setShowResults(true);
         }
       } catch (error) {
         console.error('Error saving trip:', error);
+        // Show results even if there's an error
+        setShowResults(true);
       } finally {
         setSaving(false);
       }
+    } else {
+      // If no trip data, show results immediately
+      setShowResults(true);
     }
   };
 
@@ -349,7 +358,7 @@ export default function FareResults() {
             {showResults && paidFare ? (
               <View style={styles.successContainer}>
                 <Text style={styles.successText}>دفعت: {paidFare} جنيه</Text>
-                // Split it either u paid more or u paid less
+                {/* Split it either u paid more or u paid less */}
                 {validationStatus === 'below_min_fare' && (
                   <Text style={styles.warningText}>تحذير: دفعت أقل مما يدفعه الناس عادة</Text>
                 )}
@@ -649,6 +658,12 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: 14,
     color: '#FFC107', // yellow
     marginTop: 4,
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#FF0000', // red for debugging
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   inputContainer: {
     gap: 12,

@@ -198,8 +198,6 @@ export default function Home() {
 
       {/* Banner Ad */}
       <BannerAdComponent containerStyle={styles.bannerAdContainer} />
-        </View>
-      </ScrollView>
 
       {/* Governorate Selection Modal */}
       <Modal

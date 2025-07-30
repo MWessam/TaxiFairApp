@@ -184,13 +184,16 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
         const response = await saveTrip(tripData);
         if (!response.success) {
           setLoading(false);
+          console.log('Error saving trip:', response);
           // Alert.alert('حدث خطأ أثناء حفظ الرحلة');
           return;
         }
         
         // Navigate to results with status
+        console.log('Response:', response);
+        console.log('Status:', response.status);
         router.push({
-          pathname: '/fare-result',
+          pathname: '/(other)/FareResults',
           params: {
             from: fromObj.name,
             to: toObj.name,
@@ -205,11 +208,12 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
               minute: '2-digit',
               hour12: true 
             }) : null,
-            estimate: fare,
+            paidFare: fare,
             status: response.status || null,
             tripData: JSON.stringify(tripData)
           }
         });
+        return; // Exit early for submit mode
       }
       
       setLoading(false);
@@ -235,7 +239,6 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
           estimate,
           distance,
           governorate,
-          status: tripStatus, // pass validation status
           // If in submit mode and fare is provided, pass it
           ...(fare && { paidFare: fare }),
           // Pass mode to FareResults
@@ -259,6 +262,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
     } catch (err) {
       setLoading(false);
       Alert.alert('حدث خطأ أثناء حساب المسافة أو التقدير');
+      console.error('Error saving trip:', err);
     }
   };
 

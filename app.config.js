@@ -3,9 +3,9 @@ export default {
   "expo": {
     "name": "TaxiFairMock",
     "slug": "TaxiFairMock",
-    "version": "1.0.14",
+    "version": "1.0.17",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/cair_icon_transparent.png",
     "scheme": "taxifairmock",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
@@ -26,12 +26,12 @@ export default {
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/cair_icon_transparent.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.MedoWessam.TaxiOgraApp",
-      "versionCode": 24,
+      "versionCode": 27,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
@@ -45,17 +45,17 @@ export default {
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/cair_icon_transparent.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+                  "image": "./assets/images/cair_icon_transparent.png",
+        "imageWidth": 200,
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
         }
       ],
       "expo-location",
