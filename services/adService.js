@@ -48,11 +48,15 @@ class AdService {
     if (this.isInitialized) return;
 
     try {
+      console.log('AdService: Starting initialization...');
+      
       // Initialize mobile ads
       await mobileAds().initialize();
+      console.log('AdService: Mobile ads initialized');
       
       // Check if user is premium
       await this.checkPremiumStatus();
+      console.log('AdService: Premium status checked:', this.isPremiumUser);
       
       // Load initial interstitial ad
       if (!this.isPremiumUser) {
@@ -70,6 +74,7 @@ class AdService {
     try {
       const premiumStatus = await AsyncStorage.getItem('isPremiumUser');
       this.isPremiumUser = premiumStatus === 'true';
+      console.log('AdService: Premium status from storage:', premiumStatus);
     } catch (error) {
       console.error('AdService: Error checking premium status:', error);
       this.isPremiumUser = false;
@@ -80,6 +85,7 @@ class AdService {
     try {
       await AsyncStorage.setItem('isPremiumUser', isPremium.toString());
       this.isPremiumUser = isPremium;
+      console.log('AdService: Premium status set to:', isPremium);
       
       if (isPremium) {
         // Clean up ads for premium users
@@ -94,15 +100,21 @@ class AdService {
   }
 
   getAdUnitId(type) {
-    // Use test IDs in development, production IDs in production
+    // Force test IDs for now to ensure ads show
     const isDevelopment = __DEV__;
-    return isDevelopment ? this.config.testIds[type] : this.config.productionIds[type];
+    const unitId = isDevelopment ? this.config.testIds[type] : this.config.productionIds[type];
+    console.log(`AdService: Getting ${type} ad unit ID:`, unitId, 'Development:', isDevelopment);
+    return unitId;
   }
 
   async loadInterstitialAd() {
-    if (this.isPremiumUser) return;
+    if (this.isPremiumUser) {
+      console.log('AdService: Skipping ad load - user is premium');
+      return;
+    }
 
     try {
+      console.log('AdService: Loading interstitial ad...');
       this.interstitialAd = InterstitialAd.createForAdRequest(
         this.getAdUnitId('interstitial'),
         {
@@ -114,7 +126,7 @@ class AdService {
       const unsubscribeLoaded = this.interstitialAd.addAdEventListener(
         AdEventType.LOADED,
         () => {
-          console.log('AdService: Interstitial ad loaded');
+          console.log('AdService: Interstitial ad loaded successfully');
         }
       );
 
@@ -127,11 +139,20 @@ class AdService {
         }
       );
 
+      const unsubscribeError = this.interstitialAd.addAdEventListener(
+        AdEventType.ERROR,
+        (error) => {
+          console.error('AdService: Interstitial ad error:', error);
+        }
+      );
+
       await this.interstitialAd.load();
+      console.log('AdService: Interstitial ad load request sent');
       
       return () => {
         unsubscribeLoaded();
         unsubscribeClosed();
+        unsubscribeError();
       };
     } catch (error) {
       console.error('AdService: Error loading interstitial ad:', error);
@@ -139,7 +160,14 @@ class AdService {
   }
 
   async showInterstitialAd() {
-    if (this.isPremiumUser) return false;
+    console.log('AdService: Attempting to show interstitial ad...');
+    console.log('AdService: Premium user:', this.isPremiumUser);
+    console.log('AdService: Interstitial ad loaded:', this.interstitialAd?.loaded);
+    
+    if (this.isPremiumUser) {
+      console.log('AdService: Skipping ad - user is premium');
+      return false;
+    }
 
     const now = Date.now();
     
@@ -160,14 +188,14 @@ class AdService {
         await this.interstitialAd.show();
         this.adCount++;
         this.lastAdTime = now;
-        console.log('AdService: Interstitial ad shown');
+        console.log('AdService: Interstitial ad shown successfully');
         return true;
       } catch (error) {
         console.error('AdService: Error showing interstitial ad:', error);
         return false;
       }
     } else {
-      console.log('AdService: Interstitial ad not ready');
+      console.log('AdService: Interstitial ad not ready, attempting to load new ad');
       // Try to load a new ad
       await this.loadInterstitialAd();
       return false;
@@ -176,11 +204,13 @@ class AdService {
 
   // Show ad when user tries to go back from fare results
   async showAdWhenGoingBackFromResults() {
+    console.log('AdService: Showing ad when going back from results');
     return await this.showInterstitialAd();
   }
 
   // Show ad after trip estimation (not tracking)
   async showAdAfterTripEstimation() {
+    console.log('AdService: Showing ad after trip estimation');
     return await this.showInterstitialAd();
   }
 
@@ -188,13 +218,19 @@ class AdService {
   resetAdCount() {
     this.adCount = 0;
     this.lastAdTime = 0;
+    console.log('AdService: Ad count reset');
   }
 
   // Get banner ad component
   getBannerAd() {
-    if (this.isPremiumUser) return null;
+    console.log('AdService: Getting banner ad, premium user:', this.isPremiumUser);
+    
+    if (this.isPremiumUser) {
+      console.log('AdService: Skipping banner ad - user is premium');
+      return null;
+    }
 
-    return (
+    const bannerAd = (
       <BannerAd
         unitId={this.getAdUnitId('banner')}
         size={BannerAdSize.BANNER}
@@ -202,13 +238,24 @@ class AdService {
           requestNonPersonalizedAdsOnly: true,
           keywords: ['taxi', 'transportation', 'travel'],
         }}
+        onAdLoaded={() => {
+          console.log('AdService: Banner ad loaded successfully');
+        }}
+        onAdFailedToLoad={(error) => {
+          console.error('AdService: Banner ad failed to load:', error);
+        }}
       />
     );
+    
+    console.log('AdService: Banner ad component created');
+    return bannerAd;
   }
 
   // Check if user should see ads
   shouldShowAds() {
-    return !this.isPremiumUser;
+    const shouldShow = !this.isPremiumUser;
+    console.log('AdService: Should show ads:', shouldShow);
+    return shouldShow;
   }
 }
 

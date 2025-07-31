@@ -29,6 +29,8 @@ export default function TrackRide() {
   const [backgroundPermissionGranted, setBackgroundPermissionGranted] = useState(false);
   const [isMockMode, setIsMockMode] = useState(false);
   const [mockInterval, setMockInterval] = useState(null);
+  const [locationSubscription, setLocationSubscription] = useState(null);
+  const [foregroundTracking, setForegroundTracking] = useState(false);
   
   // Check background permission status
   const checkBackgroundPermission = async () => {
@@ -67,7 +69,76 @@ export default function TrackRide() {
       return false;
     }
   };
-  
+
+  // Start foreground location tracking as fallback
+  const startForegroundTracking = async (startLocation) => {
+    try {
+      console.log('Starting foreground location tracking');
+      
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 3000, // Update every 3 seconds
+          distanceInterval: 5, // Update every 5 meters
+        },
+        (location) => {
+          const newLocation = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            timestamp: location.timestamp,
+          };
+          
+          setCurrentLocation(newLocation);
+          setRoute(prevRoute => {
+            const newRoute = [...prevRoute, newLocation];
+            console.log('Foreground tracking: Added location point', newLocation);
+            console.log('Total route points:', newRoute.length);
+            
+            // Save to storage every 5 points
+            if (newRoute.length % 5 === 0) {
+              saveRouteToStorage(newRoute);
+            }
+            
+            return newRoute;
+          });
+        }
+      );
+      
+      setLocationSubscription(subscription);
+      setForegroundTracking(true);
+      console.log('Foreground tracking started');
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to start foreground tracking:', error);
+      return false;
+    }
+  };
+
+  // Stop foreground tracking
+  const stopForegroundTracking = async () => {
+    if (locationSubscription) {
+      await locationSubscription.remove();
+      setLocationSubscription(null);
+      setForegroundTracking(false);
+      console.log('Foreground tracking stopped');
+    }
+  };
+
+  // Save route to storage for background tracking compatibility
+  const saveRouteToStorage = async (currentRoute) => {
+    try {
+      const trackingData = await getCurrentTrackingData();
+      if (trackingData && trackingData.isTracking) {
+        trackingData.route = currentRoute;
+        await AsyncStorage.setItem('tracking_data', JSON.stringify(trackingData));
+        console.log('Saved route to storage with', currentRoute.length, 'points');
+      }
+    } catch (error) {
+      console.error('Failed to save route to storage:', error);
+    }
+  };
+
   // Mock route from Mansoura to Talkha
   const mockRoute = [
     { latitude: 31.0364, longitude: 31.3807 }, // Mansoura center
@@ -305,16 +376,6 @@ export default function TrackRide() {
     { latitude: 31.5000, longitude: 31.8440 }, // Talkha center
   ];
 
-  // This function loads the tracked route from storage and updates the map
-  const loadRouteFromStorage = async () => {
-    const trackingData = await getCurrentTrackingData();
-    if (trackingData && trackingData.route && trackingData.route.length > 0) {
-      setRoute(trackingData.route);
-      setCurrentLocation(trackingData.route[trackingData.route.length - 1]);
-    }
-    return trackingData?.route || [];
-  };
-
   // Mock tracking functions
   const startMockTracking = async () => {
     console.log('Starting mock tracking');
@@ -415,13 +476,14 @@ export default function TrackRide() {
       // Set up a listener to update the route on the map in real-time
       const interval = setInterval(async () => {
         const isActive = await isTrackingActive();
-        if (isActive) {
+        if (isActive && !foregroundTracking) {
+          // Only update from storage if we're not using foreground tracking
           loadRouteFromStorage();
         }
       }, 2000);
 
       return () => clearInterval(interval);
-    }, [])
+    }, [foregroundTracking])
   );
   // This effect handles the case where the user taps the "stop tracking" notification
   useEffect(() => {
@@ -431,14 +493,17 @@ export default function TrackRide() {
     }
   }, [params.finalize_trip]);
 
-  // Cleanup mock interval on unmount
+  // Cleanup mock interval and location subscription on unmount
   useEffect(() => {
     return () => {
       if (mockInterval) {
         clearInterval(mockInterval);
       }
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
     };
-  }, [mockInterval]);
+  }, [mockInterval, locationSubscription]);
 
   const startTracking = async () => {
     console.log('Starting tracking');
@@ -512,8 +577,9 @@ export default function TrackRide() {
     // Clear any existing tracking data
     await clearTrackingData();
     console.log('Cleared tracked locations');
-    setRoute([]);
-    console.log('Set route to empty array');
+    setRoute([location]); // Initialize route with starting location
+    setCurrentLocation(location);
+    console.log('Set route with initial location:', location);
     
     // Start background tracking with current location
     const success = await startBackgroundTracking(location);
@@ -522,9 +588,20 @@ export default function TrackRide() {
       setIsTracking(true);
       setHasStarted(true);
       console.log('Set isTracking to true');
+      
+      // Also start foreground tracking as backup
+      await startForegroundTracking(location);
     } else {
-      console.log('Failed to start background tracking');
-      Alert.alert('Error', 'Failed to start background tracking. Please try again.');
+      console.log('Failed to start background tracking, using foreground only');
+      // Fallback to foreground tracking only
+      const foregroundSuccess = await startForegroundTracking(location);
+      if (foregroundSuccess) {
+        setIsTracking(true);
+        setHasStarted(true);
+        console.log('Started foreground tracking as fallback');
+      } else {
+        Alert.alert('Error', 'Failed to start location tracking. Please try again.');
+      }
     }
   };
 
@@ -532,6 +609,9 @@ export default function TrackRide() {
     setLoading(true);
     
     try {
+      // Stop foreground tracking first
+      await stopForegroundTracking();
+      
       // Handle mock mode differently
       if (isMockMode) {
         await stopMockTracking();
@@ -591,26 +671,40 @@ export default function TrackRide() {
       // Stop background tracking
       await stopBackgroundTracking();
       
-      // Get the tracking data
-      const trackingData = await getCurrentTrackingData();
-      if (!trackingData || !trackingData.route || trackingData.route.length < 2) {
-        Alert.alert("Error", "Not enough location points were recorded for a trip.");
-        setLoading(false);
-        await clearTrackingData();
-        setIsTracking(false);
-        setHasStarted(false);
-        setRoute([]);
-        return;
+      // Use current route state if available, otherwise get from storage
+      let finalRoute = route;
+      let startTime = new Date();
+      
+      if (route.length < 2) {
+        // Try to get data from storage as fallback
+        const trackingData = await getCurrentTrackingData();
+        if (trackingData && trackingData.route && trackingData.route.length >= 2) {
+          finalRoute = trackingData.route;
+          startTime = new Date(trackingData.startTime);
+        } else {
+          Alert.alert("Error", "Not enough location points were recorded for a trip.");
+          setLoading(false);
+          await clearTrackingData();
+          setIsTracking(false);
+          setHasStarted(false);
+          setRoute([]);
+          return;
+        }
+      } else {
+        // Use current route state
+        startTime = new Date(Date.now() - (route.length * 3000)); // Approximate start time based on 3-second intervals
       }
 
-      const finalRoute = trackingData.route;
-      const startTime = new Date(trackingData.startTime);
       const endTime = new Date();
       const durationMs = endTime.getTime() - startTime.getTime();
       const durationMinutes = Math.round(durationMs / 60000);
 
       const startLoc = finalRoute[0];
       const endLoc = finalRoute[finalRoute.length - 1];
+
+      console.log('Processing trip with route points:', finalRoute.length);
+      console.log('Start location:', startLoc);
+      console.log('End location:', endLoc);
 
       const [startAddressName, endAddressName, governorate] = await Promise.all([
         getAddressFromCoords(startLoc.latitude, startLoc.longitude),
@@ -620,6 +714,9 @@ export default function TrackRide() {
       
       const distance = calculateRouteDistance(finalRoute);
       const distilled = distillRoute(finalRoute, 20);
+
+      console.log('Calculated distance:', distance, 'km');
+      console.log('Duration:', durationMinutes, 'minutes');
 
       const tripData = {
         from: { lat: startLoc.latitude, lng: startLoc.longitude, name: startAddressName },
@@ -675,6 +772,24 @@ export default function TrackRide() {
     return `${distance.toFixed(1)} كم`;
   };
 
+  // Debug function to add a test location point
+  const addTestLocation = () => {
+    if (currentLocation && isTracking) {
+      const testLocation = {
+        latitude: currentLocation.latitude + (Math.random() - 0.5) * 0.001,
+        longitude: currentLocation.longitude + (Math.random() - 0.5) * 0.001,
+        timestamp: Date.now(),
+      };
+      
+      setRoute(prevRoute => {
+        const newRoute = [...prevRoute, testLocation];
+        console.log('Added test location point:', testLocation);
+        console.log('Total route points:', newRoute.length);
+        return newRoute;
+      });
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -711,7 +826,12 @@ export default function TrackRide() {
           <MapboxGL.UserLocation 
             visible={true}
             showsUserHeadingIndicator={true}
-            onUpdate={(location) => setCurrentLocation(location.coords)}
+            onUpdate={(location) => {
+              // Only update if we're not already tracking
+              if (!isTracking) {
+                setCurrentLocation(location.coords);
+              }
+            }}
           />
 
           {/* Route Line */}
@@ -724,13 +844,14 @@ export default function TrackRide() {
             </MapboxGL.ShapeSource>
           )}
           
-          {/* Debug: Show route info
+          {/* Debug: Show route info */}
           {route.length > 0 && (
             <View style={styles.debugInfo}>
               <Text style={styles.debugText}>Route points: {route.length}</Text>
+              <Text style={styles.debugText}>Distance: {getDistanceText()}</Text>
               <Text style={styles.debugText}>Current: {currentLocation ? `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}` : 'None'}</Text>
             </View>
-          )} */}
+          )}
 
           {/* Start Location Pin */}
           {hasStarted && route.length > 0 && (
@@ -792,14 +913,14 @@ export default function TrackRide() {
                   <Text style={styles.startButtonText}>بدء التتبع</Text>
                 </TouchableOpacity>
                 
-                {/* Mock Tracking Button
+                {/* Mock Tracking Button */}
                 <TouchableOpacity 
                   style={styles.mockButton} 
                   onPress={startMockTracking}
                 >
                   <Text style={styles.mockButtonIcon}>🧪</Text>
                   <Text style={styles.mockButtonText}>تجربة المسار الوهمي (من موقعك الحالي إلى طلخا)</Text>
-                </TouchableOpacity> */}
+                </TouchableOpacity>
               </View>
             ) : (
               <View style={{ width: '100%', alignItems: 'center' }}>
@@ -823,6 +944,21 @@ export default function TrackRide() {
                 )}
                 
                 {loading && <ActivityIndicator size="large" color="#5C2633" style={styles.loading} />}
+                
+                {/* Debug Info */}
+                <View style={styles.debugContainer}>
+                  <Text style={styles.debugText}>Tracking Mode: {foregroundTracking ? 'Foreground' : 'Background'}</Text>
+                  <Text style={styles.debugText}>Route Points: {route.length}</Text>
+                  <Text style={styles.debugText}>Current Location: {currentLocation ? 'Yes' : 'No'}</Text>
+                </View>
+                
+                {/* Test Button */}
+                <TouchableOpacity 
+                  style={styles.testButton} 
+                  onPress={addTestLocation}
+                >
+                  <Text style={styles.testButtonText}>Add Test Location Point</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -1122,5 +1258,23 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontFamily: 'monospace',
+  },
+  debugContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 8,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  testButton: {
+    backgroundColor: '#10b981',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 8,
+  },
+  testButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

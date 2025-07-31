@@ -59,7 +59,18 @@ export default {
         }
       ],
       "expo-location",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "android": {
+            "appId": "ca-app-pub-3940256099942544~3347511713"
+          },
+          "ios": {
+            "appId": "ca-app-pub-3940256099942544~1458002511"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

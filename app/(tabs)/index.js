@@ -1,7 +1,7 @@
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Dimensions, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Dimensions, ScrollView, Animated, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/constants/ThemeContext';
 import { getAvailableGovernorates } from '@/constants/Colors';
@@ -62,6 +62,19 @@ export default function Home() {
   const handleGovernorateSelect = (governorateKey) => {
     changeGovernorate(governorateKey);
     setShowGovernorateModal(false);
+  };
+
+  // Debug function to reset premium status and test ads
+  const handleDebugAds = async () => {
+    try {
+      await adService.setPremiumStatus(false);
+      adService.resetAdCount();
+      console.log('Debug: Premium status reset, ad count reset');
+      Alert.alert('Debug', 'Premium status reset. Ads should now show.');
+    } catch (error) {
+      console.error('Debug: Error resetting premium status:', error);
+      Alert.alert('Debug Error', 'Failed to reset premium status');
+    }
   };
 
   const animateButton = (buttonScale, callback) => {
@@ -192,6 +205,15 @@ export default function Home() {
                 <Text style={styles.premiumButtonText}>إزالة الإعلانات</Text>
               </TouchableOpacity>
             )}
+            
+            {/* Debug button for testing ads */}
+            <TouchableOpacity
+              style={[styles.premiumButton, { backgroundColor: '#ff6b6b', marginTop: 10 }]}
+              activeOpacity={0.8}
+              onPress={handleDebugAds}
+            >
+              <Text style={styles.premiumButtonText}>Debug: Reset Ads</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
