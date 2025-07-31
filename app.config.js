@@ -3,7 +3,7 @@ export default {
   "expo": {
     "name": "TaxiFairMock",
     "slug": "TaxiFairMock",
-    "version": "1.0.17",
+    "version": "1.0.21",
     "orientation": "portrait",
     "icon": "./assets/images/cair_icon_transparent.png",
     "scheme": "taxifairmock",
@@ -31,7 +31,7 @@ export default {
       },
       "edgeToEdgeEnabled": true,
       "package": "com.MedoWessam.TaxiOgraApp",
-      "versionCode": 27,
+      "versionCode": 31,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
@@ -59,18 +59,7 @@ export default {
         }
       ],
       "expo-location",
-      "expo-notifications",
-      [
-        "react-native-google-mobile-ads",
-        {
-          "android": {
-            "appId": "ca-app-pub-3940256099942544~3347511713"
-          },
-          "ios": {
-            "appId": "ca-app-pub-3940256099942544~1458002511"
-          }
-        }
-      ]
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true
