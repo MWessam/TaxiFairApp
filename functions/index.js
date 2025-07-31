@@ -28,7 +28,7 @@ const MAX_SUBMISSIONS_PER_DAY = 100;  // More reasonable for mobile app users
 const OFFICIAL_TARIFF_BASE_FARE = 9;
 const OFFICIAL_TARIFF_PER_KM = 2;
 const OFFICIAL_TARIFF_MIN_PERCENT_MODIFIER = 0.15;
-const OFFICIAL_TARIFF_MAX_PERCENT_MODIFIER = 0.60;
+const OFFICIAL_TARIFF_MAX_PERCENT_MODIFIER = 1.0;
 
 // Zone management is now handled by zone-manager.js
 
@@ -502,7 +502,9 @@ exports.analyzeSimilarTrips = onCall({
     let tripsQuery = db.collection('trips')
       .where('distance', '>=', distanceRangeStart)
       .where('distance', '<=', distanceRangeEnd)
-      .where('fare', '>', 0);
+      .where('fare', '>', 0)
+      .where('to_zone', '==', toZone)
+      .where('from_zone', '==', fromZone);
       // Note: We'll filter suspicious trips in application logic to include records without suspicious field
 
     if (process.env.DEBUG_LOGS === 'true') {

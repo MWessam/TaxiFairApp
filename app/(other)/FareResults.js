@@ -7,6 +7,10 @@ import { useTheme } from '@/constants/ThemeContext';
 import { useFavorites } from '@/constants/FavoritesContext';
 import adService from '../../services/adService';
 
+// Legal tariff constants
+const OFFICIAL_TARIFF_BASE_FARE = 9;
+const OFFICIAL_TARIFF_PER_KM = 2;
+
 export default function FareResults() {
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -352,13 +356,46 @@ export default function FareResults() {
                 <Text style={styles.estimatedFareNotFound}>
                   لا توجد رحلات او بيانات كافية لتحليل رحلتك
                 </Text>
+
               )}
+
+              <Text style={styles.legalFareText}>التعريفة القانونية للمشوار هيه: {OFFICIAL_TARIFF_BASE_FARE} + {OFFICIAL_TARIFF_PER_KM} * {params.distance} = {OFFICIAL_TARIFF_BASE_FARE + OFFICIAL_TARIFF_PER_KM * params.distance} جنيه</Text>
+
             </View>
 
             {showResults && paidFare ? (
               <View style={styles.successContainer}>
                 <Text style={styles.successText}>دفعت: {paidFare} جنيه</Text>
-                {/* Split it either u paid more or u paid less */}
+                
+                {/* Calculate legal fare and percentage difference */}
+                {(() => {
+                  const legalFare = OFFICIAL_TARIFF_BASE_FARE + OFFICIAL_TARIFF_PER_KM * params.distance;
+                  const paidAmount = parseFloat(paidFare);
+                  const difference = paidAmount - legalFare;
+                  const percentageDifference = ((difference / legalFare) * 100).toFixed(1);
+                  
+                  return (
+                    <>
+                      <Text style={styles.legalFareText}>
+                        التعريفة القانونية: {legalFare.toFixed(1)} جنيه
+                      </Text>
+                      {difference > 0 ? (
+                        <Text style={styles.overpaidText}>
+                          دفعت أكثر من التعريفة القانونية بـ {percentageDifference}% (+{difference.toFixed(1)} جنيه)
+                        </Text>
+                      ) : difference < 0 ? (
+                        <Text style={styles.underpaidText}>
+                          دفعت أقل من التعريفة القانونية بـ {Math.abs(percentageDifference)}% (-{Math.abs(difference).toFixed(1)} جنيه)
+                        </Text>
+                      ) : (
+                        <Text style={styles.exactFareText}>
+                          دفعت التعريفة القانونية بالضبط
+                        </Text>
+                      )}
+                    </>
+                  );
+                })()}
+                
                 {validationStatus === 'below_min_fare' && (
                   <Text style={styles.warningText}>تحذير: دفعت أقل مما يدفعه الناس عادة</Text>
                 )}
@@ -659,6 +696,30 @@ const createStyles = (theme) => StyleSheet.create({
     color: '#FFC107', // yellow
     marginTop: 4,
   },
+  legalFareText: {
+    fontSize: 14,
+    color: theme.text,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  overpaidText: {
+    fontSize: 14,
+    color: '#D32F2F', // red
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  underpaidText: {
+    fontSize: 14,
+    color: '#388E3C', // green
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  exactFareText: {
+    fontSize: 14,
+    color: '#1976D2', // blue
+    marginTop: 4,
+    fontWeight: '500',
+  },
   debugText: {
     fontSize: 12,
     color: '#FF0000', // red for debugging
@@ -830,5 +891,24 @@ const createStyles = (theme) => StyleSheet.create({
   },
   bottomPadding: {
     height: 32,
+  },
+  infoContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  infoTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: theme.text,
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    marginBottom: 2,
   },
 }); 
