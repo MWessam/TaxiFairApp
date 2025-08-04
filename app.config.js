@@ -1,12 +1,12 @@
 import 'dotenv/config';
 export default {
   "expo": {
-    "name": "TaxiFairMock",
-    "slug": "TaxiFairMock",
-    "version": "1.0.25",
+    "name": "Kam El Ogra",
+    "slug": "kam-el-ogra",
+    "version": "1.0.26",
     "orientation": "portrait",
     "icon": "./assets/images/cair_icon_transparent.png",
-    "scheme": "taxifairmock",
+    "scheme": "kam-el-ogra",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": false,
     "ios": {
@@ -31,7 +31,7 @@ export default {
       },
       "edgeToEdgeEnabled": true,
       "package": "com.MedoWessam.TaxiOgraApp",
-      "versionCode": 35,
+      "versionCode": 36,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
@@ -60,13 +60,12 @@ export default {
       ],
       "expo-location",
       "expo-notifications",
-      // Temporarily disabled AdMob for debugging
-      // [
-      //   "react-native-google-mobile-ads",
-      //   {
-      //     "android_app_id": "ca-app-pub-916645906844~8c68e10bfe7ae49d04a059"
-      //   }
-      // ]
+      [
+        "react-native-google-mobile-ads",
+        {
+          "android_app_id": "ca-app-pub-8401949226434611~5894350073"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

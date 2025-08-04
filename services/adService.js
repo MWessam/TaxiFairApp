@@ -1,14 +1,13 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// AdMob package is uninstalled - using placeholder implementation
-// import mobileAds, {
-//   BannerAd,
-//   BannerAdSize,
-//   TestIds,
-//   InterstitialAd,
-//   AdEventType,
-// } from 'react-native-google-mobile-ads';
+import mobileAds, {
+  BannerAd,
+  BannerAdSize,
+  TestIds,
+  InterstitialAd,
+  AdEventType,
+} from 'react-native-google-mobile-ads';
 
 class AdService {
   constructor() {
@@ -26,21 +25,21 @@ class AdService {
       // Maximum ads per session
       maxAdsPerSession: 3,
       
-      // Test IDs for development (placeholder since AdMob is uninstalled)
+      // Test IDs for development
       testIds: {
-        banner: 'placeholder-banner-id',
-        interstitial: 'placeholder-interstitial-id',
+        banner: TestIds.BANNER,
+        interstitial: TestIds.INTERSTITIAL,
       },
       
-      // Production IDs - replace with your actual AdMob IDs
+      // Production IDs - real AdMob IDs
       productionIds: {
         banner: Platform.select({
-          ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
-          android: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
+          ios: 'ca-app-pub-8401949226434611/7990084270', // Using Android ID for now
+          android: 'ca-app-pub-8401949226434611/7990084270',
         }),
         interstitial: Platform.select({
-          ios: 'ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ',
-          android: 'ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ',
+          ios: 'ca-app-pub-8401949226434611/5012567140', // Using Android ID for now
+          android: 'ca-app-pub-8401949226434611/5012567140',
         }),
       }
     };
@@ -52,9 +51,9 @@ class AdService {
     try {
       console.log('AdService: Starting initialization...');
       
-      // AdMob is uninstalled - skip mobile ads initialization
-      // await mobileAds().initialize();
-      console.log('AdService: Mobile ads initialization skipped (AdMob uninstalled)');
+      // Initialize mobile ads with proper error handling
+      const initializationStatus = await mobileAds().initialize();
+      console.log('AdService: Mobile ads initialized with status:', initializationStatus);
       
       // Check if user is premium
       await this.checkPremiumStatus();
@@ -66,9 +65,11 @@ class AdService {
       }
       
       this.isInitialized = true;
-      console.log('AdService: Initialized successfully (AdMob disabled)');
+      console.log('AdService: Initialized successfully');
     } catch (error) {
       console.error('AdService: Initialization failed:', error);
+      // Don't throw the error, just log it and continue
+      // This prevents the app from crashing if AdMob fails to initialize
     }
   }
 
@@ -102,9 +103,14 @@ class AdService {
   }
 
   getAdUnitId(type) {
-    // Return placeholder IDs since AdMob is uninstalled
-    console.log(`AdService: Getting ${type} ad unit ID (AdMob uninstalled)`);
-    return 'placeholder-ad-unit-id';
+    // Use production IDs for real ads, but fallback to test IDs if not initialized
+    if (!this.isInitialized) {
+      console.log(`AdService: Not initialized, using test ID for ${type}`);
+      return this.config.testIds[type];
+    }
+    const unitId = this.config.productionIds[type];
+    console.log(`AdService: Getting ${type} ad unit ID:`, unitId);
+    return unitId;
   }
 
   async loadInterstitialAd() {
@@ -114,10 +120,46 @@ class AdService {
     }
 
     try {
-      console.log('AdService: Loading interstitial ad (AdMob uninstalled)');
-      // Create placeholder interstitial ad object
-      this.interstitialAd = { loaded: false };
-      console.log('AdService: Interstitial ad load skipped (AdMob uninstalled)');
+      console.log('AdService: Loading interstitial ad...');
+      this.interstitialAd = InterstitialAd.createForAdRequest(
+        this.getAdUnitId('interstitial'),
+        {
+          requestNonPersonalizedAdsOnly: true,
+          keywords: ['taxi', 'transportation', 'travel'],
+        }
+      );
+
+      const unsubscribeLoaded = this.interstitialAd.addAdEventListener(
+        AdEventType.LOADED,
+        () => {
+          console.log('AdService: Interstitial ad loaded successfully');
+        }
+      );
+
+      const unsubscribeClosed = this.interstitialAd.addAdEventListener(
+        AdEventType.CLOSED,
+        () => {
+          console.log('AdService: Interstitial ad closed');
+          // Load the next ad
+          this.loadInterstitialAd();
+        }
+      );
+
+      const unsubscribeError = this.interstitialAd.addAdEventListener(
+        AdEventType.ERROR,
+        (error) => {
+          console.error('AdService: Interstitial ad error:', error);
+        }
+      );
+
+      await this.interstitialAd.load();
+      console.log('AdService: Interstitial ad load request sent');
+      
+      return () => {
+        unsubscribeLoaded();
+        unsubscribeClosed();
+        unsubscribeError();
+      };
     } catch (error) {
       console.error('AdService: Error loading interstitial ad:', error);
     }
@@ -194,9 +236,31 @@ class AdService {
       return null;
     }
 
-    // Return null since AdMob is uninstalled
-    console.log('AdService: Banner ad disabled (AdMob uninstalled)');
-    return null;
+    // Safety check - if not initialized, return null to prevent crashes
+    if (!this.isInitialized) {
+      console.log('AdService: Not initialized, skipping banner ad');
+      return null;
+    }
+
+    const bannerAd = (
+      <BannerAd
+        unitId={this.getAdUnitId('banner')}
+        size={BannerAdSize.BANNER}
+        requestOptions={{
+          requestNonPersonalizedAdsOnly: true,
+          keywords: ['taxi', 'transportation', 'travel'],
+        }}
+        onAdLoaded={() => {
+          console.log('AdService: Banner ad loaded successfully');
+        }}
+        onAdFailedToLoad={(error) => {
+          console.error('AdService: Banner ad failed to load:', error);
+        }}
+      />
+    );
+    
+    console.log('AdService: Banner ad component created');
+    return bannerAd;
   }
 
   // Check if user should see ads

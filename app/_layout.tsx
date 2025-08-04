@@ -25,7 +25,19 @@ export default function RootLayout() {
   useEffect(() => {
     setupNotificationHandler();
     locationService.initialize();
-    adService.initialize(); // Initialize ad service
+    
+    // Initialize ad service with a small delay to ensure app is fully loaded
+    const initializeAdService = async () => {
+      try {
+        // Small delay to ensure app is fully loaded before initializing ads
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await adService.initialize();
+      } catch (error) {
+        console.error('Failed to initialize ad service:', error);
+      }
+    };
+    
+    initializeAdService();
     
     // Check for pending fare results from notification
     const checkPendingResults = async () => {

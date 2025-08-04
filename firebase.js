@@ -1,4 +1,4 @@
-// Import the functions you need from the SDKs you need
+// Kam El Ogra - Firebase Configuration
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
