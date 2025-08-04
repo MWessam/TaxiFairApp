@@ -4,18 +4,15 @@ import adService from '../services/adService';
 
 const BannerAdComponent = ({ style, containerStyle }) => {
   const [adStatus, setAdStatus] = useState('Loading...');
-  const [shouldShowAd, setShouldShowAd] = useState(true);
 
   useEffect(() => {
     const checkAdStatus = async () => {
       try {
         const showAds = adService.shouldShowAds();
-        setShouldShowAd(showAds);
-        setAdStatus(showAds ? 'Should show ads' : 'Premium user - no ads');
+        setAdStatus(showAds ? 'Ads enabled' : 'Ads disabled');
         
         console.log('BannerAdComponent: Ad status checked:', {
-          shouldShowAds: showAds,
-          isPremium: !showAds
+          shouldShowAds: showAds
         });
       } catch (error) {
         console.error('BannerAdComponent: Error checking ad status:', error);
@@ -30,11 +27,7 @@ const BannerAdComponent = ({ style, containerStyle }) => {
 
   if (!bannerAd) {
     return (
-      <View style={[styles.container, containerStyle]}>
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>Ad Status: {adStatus}</Text>
-          <Text style={styles.debugText}>Should Show: {shouldShowAd ? 'Yes' : 'No'}</Text>
-        </View>
+      <View>
       </View>
     );
   }
@@ -42,10 +35,6 @@ const BannerAdComponent = ({ style, containerStyle }) => {
   return (
     <View style={[styles.container, containerStyle]}>
       {bannerAd}
-      <View style={styles.debugContainer}>
-        <Text style={styles.debugText}>Ad Status: {adStatus}</Text>
-        <Text style={styles.debugText}>Should Show: {shouldShowAd ? 'Yes' : 'No'}</Text>
-      </View>
     </View>
   );
 };

@@ -844,14 +844,14 @@ export default function TrackRide() {
             </MapboxGL.ShapeSource>
           )}
           
-          {/* Debug: Show route info */}
+          {/* Debug: Show route info
           {route.length > 0 && (
             <View style={styles.debugInfo}>
               <Text style={styles.debugText}>Route points: {route.length}</Text>
               <Text style={styles.debugText}>Distance: {getDistanceText()}</Text>
               <Text style={styles.debugText}>Current: {currentLocation ? `${currentLocation.latitude.toFixed(4)}, ${currentLocation.longitude.toFixed(4)}` : 'None'}</Text>
             </View>
-          )}
+          )} */}
 
           {/* Start Location Pin */}
           {hasStarted && route.length > 0 && (
@@ -913,14 +913,14 @@ export default function TrackRide() {
                   <Text style={styles.startButtonText}>بدء التتبع</Text>
                 </TouchableOpacity>
                 
-                {/* Mock Tracking Button */}
+                {/* Mock Tracking Button
                 <TouchableOpacity 
                   style={styles.mockButton} 
                   onPress={startMockTracking}
                 >
                   <Text style={styles.mockButtonIcon}>🧪</Text>
                   <Text style={styles.mockButtonText}>تجربة المسار الوهمي (من موقعك الحالي إلى طلخا)</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
             ) : (
               <View style={{ width: '100%', alignItems: 'center' }}>
@@ -946,19 +946,19 @@ export default function TrackRide() {
                 {loading && <ActivityIndicator size="large" color="#5C2633" style={styles.loading} />}
                 
                 {/* Debug Info */}
-                <View style={styles.debugContainer}>
+                {/* <View style={styles.debugContainer}>
                   <Text style={styles.debugText}>Tracking Mode: {foregroundTracking ? 'Foreground' : 'Background'}</Text>
                   <Text style={styles.debugText}>Route Points: {route.length}</Text>
                   <Text style={styles.debugText}>Current Location: {currentLocation ? 'Yes' : 'No'}</Text>
-                </View>
+                </View> */}
                 
                 {/* Test Button */}
-                <TouchableOpacity 
+                {/* <TouchableOpacity 
                   style={styles.testButton} 
                   onPress={addTestLocation}
                 >
                   <Text style={styles.testButtonText}>Add Test Location Point</Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
             )}
           </View>

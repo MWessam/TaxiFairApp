@@ -3,7 +3,7 @@ export default {
   "expo": {
     "name": "Kam El Ogra",
     "slug": "kam-el-ogra",
-    "version": "1.0.26",
+    "version": "1.0.27",
     "orientation": "portrait",
     "icon": "./assets/images/cair_icon_transparent.png",
     "scheme": "kam-el-ogra",
@@ -31,7 +31,7 @@ export default {
       },
       "edgeToEdgeEnabled": true,
       "package": "com.MedoWessam.TaxiOgraApp",
-      "versionCode": 36,
+      "versionCode": 37,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",

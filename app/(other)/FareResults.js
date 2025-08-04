@@ -234,7 +234,7 @@ export default function FareResults() {
         .filter(([_, value]) => value.count > 0)
         .map(([key, value]) => ({
           time: timeMapping[key] || key,
-          avgFare: Math.round(value.avg)
+          avgFare: Number(value.avg).toFixed(2)
         }));
     };
 
@@ -255,7 +255,7 @@ export default function FareResults() {
         .filter(([_, value]) => value.count > 0)
         .map(([key, value]) => ({
           day: dayMapping[key] || key,
-          avgFare: Math.round(value.avg)
+          avgFare: Number(value.avg).toFixed(2)
         }));
     };
 
@@ -272,7 +272,7 @@ export default function FareResults() {
         .filter(([_, value]) => value.count > 0)
         .map(([key, value]) => ({
           distance: distanceMapping[key] || key,
-          avgFare: Math.round(value.avg),
+          avgFare: Number(value.avg).toFixed(2),
           count: value.count
         }));
     };
@@ -282,8 +282,8 @@ export default function FareResults() {
       similarTripsData: transformDistanceBasedData(data.distanceBasedAverage),
       timeBasedData: transformTimeBasedData(data.timeBasedAverage),
       weeklyData: transformDayBasedData(data.dayBasedAverage),
-      averageFare: data.averageFare || 45,
-      estimatedFare: data.estimatedFare || 0,
+      averageFare: Number(data.averageFare || 45).toFixed(2),
+      estimatedFare: Number(data.estimatedFare || 0).toFixed(2),
       fareRange: data.fareRange || { min: 25, max: 65 }
     };
   };
@@ -349,9 +349,9 @@ export default function FareResults() {
               )}
               {!loadingAnalysis && analysisData && analysisData.data && (
                 analysisData.data.estimatedFare && analysisData.data.estimatedFare !== 0 ?
-                <Text style={styles.estimatedFare}>
-                  {analysisData.data.estimatedFare} جنيه
-                </Text>
+                              <Text style={styles.estimatedFare}>
+                {Number(analysisData.data.estimatedFare).toFixed(2)} جنيه
+              </Text>
                 :
                 <Text style={styles.estimatedFareNotFound}>
                   لا توجد رحلات او بيانات كافية لتحليل رحلتك
@@ -359,13 +359,13 @@ export default function FareResults() {
 
               )}
 
-              <Text style={styles.legalFareText}>التعريفة القانونية للمشوار هيه: {OFFICIAL_TARIFF_BASE_FARE} + {OFFICIAL_TARIFF_PER_KM} * {params.distance} = {OFFICIAL_TARIFF_BASE_FARE + OFFICIAL_TARIFF_PER_KM * params.distance} جنيه</Text>
+              <Text style={styles.legalFareText}>التعريفة القانونية للمشوار هيه: {OFFICIAL_TARIFF_BASE_FARE} + {OFFICIAL_TARIFF_PER_KM} * {Number(params.distance || 0).toFixed(2)} = {Number(OFFICIAL_TARIFF_BASE_FARE + OFFICIAL_TARIFF_PER_KM * (params.distance || 0)).toFixed(2)} جنيه</Text>
 
             </View>
 
             {showResults && paidFare ? (
               <View style={styles.successContainer}>
-                <Text style={styles.successText}>دفعت: {paidFare} جنيه</Text>
+                <Text style={styles.successText}>دفعت: {Number(paidFare).toFixed(2)} جنيه</Text>
                 
                 {/* Calculate legal fare and percentage difference */}
                 {(() => {
@@ -377,15 +377,15 @@ export default function FareResults() {
                   return (
                     <>
                       <Text style={styles.legalFareText}>
-                        التعريفة القانونية: {legalFare.toFixed(1)} جنيه
+                        التعريفة القانونية: {legalFare.toFixed(2)} جنيه
                       </Text>
                       {difference > 0 ? (
                         <Text style={styles.overpaidText}>
-                          دفعت أكثر من التعريفة القانونية بـ {percentageDifference}% (+{difference.toFixed(1)} جنيه)
+                          دفعت أكثر من التعريفة القانونية بـ {Number(percentageDifference).toFixed(2)}% (+{difference.toFixed(2)} جنيه)
                         </Text>
                       ) : difference < 0 ? (
                         <Text style={styles.underpaidText}>
-                          دفعت أقل من التعريفة القانونية بـ {Math.abs(percentageDifference)}% (-{Math.abs(difference).toFixed(1)} جنيه)
+                          دفعت أقل من التعريفة القانونية بـ {Number(Math.abs(percentageDifference)).toFixed(2)}% (-{Math.abs(difference).toFixed(2)} جنيه)
                         </Text>
                       ) : (
                         <Text style={styles.exactFareText}>
@@ -437,11 +437,11 @@ export default function FareResults() {
             <View style={styles.detailsContainer}>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>المسافة:</Text>
-                <Text style={styles.detailValue}>{params.distance || '4.2'} كم</Text>
+                <Text style={styles.detailValue}>{Number(params.distance || '4.2').toFixed(2)} كم</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>المدة:</Text>
-                <Text style={styles.detailValue}>{params.duration || '18'} دقيقة</Text>
+                <Text style={styles.detailValue}>{Number(params.duration || '18').toFixed(2)} دقيقة</Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>الوقت:</Text>
@@ -505,7 +505,7 @@ export default function FareResults() {
                         تم العثور على {analysisData.data.similarTripsCount} رحلة مشابهة
                       </Text>
                       <Text style={styles.infoText}>
-                        نطاق الأجرة: {analysisData.data.fareRange?.min || 25} - {analysisData.data.fareRange?.max || 65} جنيه
+                        نطاق الأجرة: {Number(analysisData.data.fareRange?.min || 25).toFixed(2)} - {Number(analysisData.data.fareRange?.max || 65).toFixed(2)} جنيه
                       </Text>
                     </View>
                   </View>

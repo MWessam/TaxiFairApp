@@ -9,7 +9,6 @@ import { configureMapbox } from '@/mapboxProvider';
 import LocationPermissionRequest from '../../components/LocationPermissionRequest';
 import locationService from '../../services/locationService';
 import BannerAdComponent from '../../components/BannerAdComponent';
-import PremiumUpgradeModal from '../../components/PremiumUpgradeModal';
 import adService from '../../services/adService';
 
 const { width, height } = Dimensions.get('window');
@@ -18,7 +17,6 @@ export default function Home() {
   const router = useRouter();
   const { theme, currentGovernorate, changeGovernorate } = useTheme();
   const [showGovernorateModal, setShowGovernorateModal] = useState(false);
-  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [isRouterReady, setIsRouterReady] = useState(false);
   const routerRef = useRef(router);
   const availableGovernorates = getAvailableGovernorates();
@@ -64,18 +62,7 @@ export default function Home() {
     setShowGovernorateModal(false);
   };
 
-  // Debug function to reset premium status and test ads
-  const handleDebugAds = async () => {
-    try {
-      await adService.setPremiumStatus(false);
-      adService.resetAdCount();
-      console.log('Debug: Premium status reset, ad count reset');
-      Alert.alert('Debug', 'Premium status reset. Ads should now show.');
-    } catch (error) {
-      console.error('Debug: Error resetting premium status:', error);
-      Alert.alert('Debug Error', 'Failed to reset premium status');
-    }
-  };
+
 
   const animateButton = (buttonScale, callback) => {
     Animated.sequence([
@@ -195,25 +182,6 @@ export default function Home() {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>ساعد في تحسين أسعار التاكسي في مصر</Text>
-            
-            {/* Premium Upgrade Button */}
-            {adService.shouldShowAds() && (
-              <TouchableOpacity
-                style={styles.premiumButton}
-                onPress={() => setShowPremiumModal(true)}
-              >
-                <Text style={styles.premiumButtonText}>إزالة الإعلانات</Text>
-              </TouchableOpacity>
-            )}
-            
-            {/* Debug button for testing ads */}
-            <TouchableOpacity
-              style={[styles.premiumButton, { backgroundColor: '#ff6b6b', marginTop: 10 }]}
-              activeOpacity={0.8}
-              onPress={handleDebugAds}
-            >
-              <Text style={styles.premiumButtonText}>Debug: Reset Ads</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>
@@ -270,11 +238,7 @@ export default function Home() {
         </View>
       </Modal>
 
-      {/* Premium Upgrade Modal */}
-      <PremiumUpgradeModal
-        visible={showPremiumModal}
-        onClose={() => setShowPremiumModal(false)}
-      />
+
     </View>
   );
 }
