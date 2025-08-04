@@ -1,12 +1,14 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import mobileAds, {
-  BannerAd,
-  BannerAdSize,
-  TestIds,
-  InterstitialAd,
-  AdEventType,
-} from 'react-native-google-mobile-ads';
+
+// AdMob package is uninstalled - using placeholder implementation
+// import mobileAds, {
+//   BannerAd,
+//   BannerAdSize,
+//   TestIds,
+//   InterstitialAd,
+//   AdEventType,
+// } from 'react-native-google-mobile-ads';
 
 class AdService {
   constructor() {
@@ -24,10 +26,10 @@ class AdService {
       // Maximum ads per session
       maxAdsPerSession: 3,
       
-      // Test IDs for development
+      // Test IDs for development (placeholder since AdMob is uninstalled)
       testIds: {
-        banner: TestIds.BANNER,
-        interstitial: TestIds.INTERSTITIAL,
+        banner: 'placeholder-banner-id',
+        interstitial: 'placeholder-interstitial-id',
       },
       
       // Production IDs - replace with your actual AdMob IDs
@@ -50,9 +52,9 @@ class AdService {
     try {
       console.log('AdService: Starting initialization...');
       
-      // Initialize mobile ads
-      await mobileAds().initialize();
-      console.log('AdService: Mobile ads initialized');
+      // AdMob is uninstalled - skip mobile ads initialization
+      // await mobileAds().initialize();
+      console.log('AdService: Mobile ads initialization skipped (AdMob uninstalled)');
       
       // Check if user is premium
       await this.checkPremiumStatus();
@@ -64,7 +66,7 @@ class AdService {
       }
       
       this.isInitialized = true;
-      console.log('AdService: Initialized successfully');
+      console.log('AdService: Initialized successfully (AdMob disabled)');
     } catch (error) {
       console.error('AdService: Initialization failed:', error);
     }
@@ -100,11 +102,9 @@ class AdService {
   }
 
   getAdUnitId(type) {
-    // Force test IDs for now to ensure ads show
-    const isDevelopment = __DEV__;
-    const unitId = isDevelopment ? this.config.testIds[type] : this.config.productionIds[type];
-    console.log(`AdService: Getting ${type} ad unit ID:`, unitId, 'Development:', isDevelopment);
-    return unitId;
+    // Return placeholder IDs since AdMob is uninstalled
+    console.log(`AdService: Getting ${type} ad unit ID (AdMob uninstalled)`);
+    return 'placeholder-ad-unit-id';
   }
 
   async loadInterstitialAd() {
@@ -114,46 +114,10 @@ class AdService {
     }
 
     try {
-      console.log('AdService: Loading interstitial ad...');
-      this.interstitialAd = InterstitialAd.createForAdRequest(
-        this.getAdUnitId('interstitial'),
-        {
-          requestNonPersonalizedAdsOnly: true,
-          keywords: ['taxi', 'transportation', 'travel'],
-        }
-      );
-
-      const unsubscribeLoaded = this.interstitialAd.addAdEventListener(
-        AdEventType.LOADED,
-        () => {
-          console.log('AdService: Interstitial ad loaded successfully');
-        }
-      );
-
-      const unsubscribeClosed = this.interstitialAd.addAdEventListener(
-        AdEventType.CLOSED,
-        () => {
-          console.log('AdService: Interstitial ad closed');
-          // Load the next ad
-          this.loadInterstitialAd();
-        }
-      );
-
-      const unsubscribeError = this.interstitialAd.addAdEventListener(
-        AdEventType.ERROR,
-        (error) => {
-          console.error('AdService: Interstitial ad error:', error);
-        }
-      );
-
-      await this.interstitialAd.load();
-      console.log('AdService: Interstitial ad load request sent');
-      
-      return () => {
-        unsubscribeLoaded();
-        unsubscribeClosed();
-        unsubscribeError();
-      };
+      console.log('AdService: Loading interstitial ad (AdMob uninstalled)');
+      // Create placeholder interstitial ad object
+      this.interstitialAd = { loaded: false };
+      console.log('AdService: Interstitial ad load skipped (AdMob uninstalled)');
     } catch (error) {
       console.error('AdService: Error loading interstitial ad:', error);
     }
@@ -230,25 +194,9 @@ class AdService {
       return null;
     }
 
-    const bannerAd = (
-      <BannerAd
-        unitId={this.getAdUnitId('banner')}
-        size={BannerAdSize.BANNER}
-        requestOptions={{
-          requestNonPersonalizedAdsOnly: true,
-          keywords: ['taxi', 'transportation', 'travel'],
-        }}
-        onAdLoaded={() => {
-          console.log('AdService: Banner ad loaded successfully');
-        }}
-        onAdFailedToLoad={(error) => {
-          console.error('AdService: Banner ad failed to load:', error);
-        }}
-      />
-    );
-    
-    console.log('AdService: Banner ad component created');
-    return bannerAd;
+    // Return null since AdMob is uninstalled
+    console.log('AdService: Banner ad disabled (AdMob uninstalled)');
+    return null;
   }
 
   // Check if user should see ads
