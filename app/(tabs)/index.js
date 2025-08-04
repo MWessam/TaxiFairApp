@@ -4,18 +4,22 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Dimensions, ScrollView, Animated, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/constants/ThemeContext';
+import { useAuth } from '@/constants/AuthContext';
 import { getAvailableGovernorates } from '@/constants/Colors';
 import { configureMapbox } from '@/mapboxProvider';
 import LocationPermissionRequest from '../../components/LocationPermissionRequest';
+import SignInScreen from '../../components/SignInScreen';
 import locationService from '../../services/locationService';
 import BannerAdComponent from '../../components/BannerAdComponent';
 import adService from '../../services/adService';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
 export default function Home() {
   const router = useRouter();
   const { theme, currentGovernorate, changeGovernorate } = useTheme();
+  const { user, loading: authLoading, isAuthenticated, signOut } = useAuth();
   const [showGovernorateModal, setShowGovernorateModal] = useState(false);
   const [isRouterReady, setIsRouterReady] = useState(false);
   const routerRef = useRef(router);
@@ -62,8 +66,6 @@ export default function Home() {
     setShowGovernorateModal(false);
   };
 
-
-
   const animateButton = (buttonScale, callback) => {
     Animated.sequence([
       Animated.timing(buttonScale, {
@@ -91,7 +93,30 @@ export default function Home() {
     });
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+      Alert.alert('خطأ', 'حدث خطأ أثناء تسجيل الخروج');
+    }
+  };
+
   const styles = createStyles(theme);
+
+  // Show loading screen while auth is initializing
+  if (authLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>جاري التحميل...</Text>
+      </View>
+    );
+  }
+
+  // Show sign-in screen if not authenticated
+  if (!isAuthenticated) {
+    return <SignInScreen />;
+  }
 
   return (
     <View style={styles.container}>
@@ -100,42 +125,29 @@ export default function Home() {
       
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.appTitle}>تاكسي مصر</Text>
-        <Text style={styles.subtitle}>تتبع أسعار التاكسي في مصر</Text>
+        <View style={styles.headerContent}>
+          <TouchableOpacity 
+            style={styles.userButton} 
+            onPress={handleSignOut}
+          >
+            <Ionicons name="person-circle" size={24} color={theme.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.appTitle}>تاكسي مصر</Text>
+            <Text style={styles.subtitle}>تتبع أسعار التاكسي في مصر</Text>
+            {user && (
+              <Text style={styles.userInfo}>
+                {user.displayName || user.email || 'مستخدم'}
+              </Text>
+            )}
+          </View>
+          <View style={styles.headerSpacer} />
+        </View>
       </View>
 
       {/* Main content */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.mainContent}>
-          {/* Theme Selector Card */}
-          {/* <View style={styles.themeCard}>
-            <View style={styles.themeCardHeader}>
-              <Text style={styles.themeCardIcon}>🎨</Text>
-              <Text style={styles.themeCardTitle}>اختر محافظتك</Text>
-            </View>
-            <View style={styles.themeGrid}>
-              {availableGovernorates.slice(0, 4).map((gov) => (
-                <TouchableOpacity
-                  key={gov.key}
-                  style={[
-                    styles.themeButton,
-                    currentGovernorate === gov.key && styles.selectedThemeButton
-                  ]}
-                  onPress={() => handleGovernorateSelect(gov.key)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.themeColorDot, { backgroundColor: gov.primary }]} />
-                  <Text style={[
-                    styles.themeButtonText,
-                    currentGovernorate === gov.key && styles.selectedThemeButtonText
-                  ]}>
-                    {gov.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View> */}
-
           {/* Main Track Ride Button */}
           <Animated.View style={{ transform: [{ scale: buttonScale3 }] }}>
             <TouchableOpacity 
@@ -199,36 +211,34 @@ export default function Home() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>اختر المحافظة</Text>
+              <Text style={styles.modalTitle}>اختر محافظتك</Text>
               <TouchableOpacity 
+                style={styles.modalCloseButton}
                 onPress={() => setShowGovernorateModal(false)}
-                style={styles.closeButton}
               >
-                <Text style={styles.closeButtonText}>✕</Text>
+                <Ionicons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
-            
             <FlatList
               data={availableGovernorates}
               keyExtractor={(item) => item.key}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
-                    styles.governorateItem,
-                    currentGovernorate === item.key && styles.selectedGovernorateItem
+                    styles.modalItem,
+                    currentGovernorate === item.key && styles.selectedModalItem
                   ]}
                   onPress={() => handleGovernorateSelect(item.key)}
-                  activeOpacity={0.7}
                 >
-                  <View style={[styles.colorPreview, { backgroundColor: item.primary }]} />
+                  <View style={[styles.modalItemColor, { backgroundColor: item.primary }]} />
                   <Text style={[
-                    styles.governorateItemText,
-                    currentGovernorate === item.key && styles.selectedGovernorateItemText
+                    styles.modalItemText,
+                    currentGovernorate === item.key && styles.selectedModalItemText
                   ]}>
                     {item.name}
                   </Text>
                   {currentGovernorate === item.key && (
-                    <Text style={styles.checkmark}>✓</Text>
+                    <Ionicons name="checkmark" size={20} color={theme.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -237,8 +247,6 @@ export default function Home() {
           </View>
         </View>
       </Modal>
-
-
     </View>
   );
 }
@@ -254,6 +262,22 @@ const createStyles = (theme) => StyleSheet.create({
     paddingBottom: 20,
     alignItems: 'center',
   },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  userButton: {
+    padding: 8,
+  },
+  headerTextContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerSpacer: {
+    width: 50, // Space for the user button
+  },
   appTitle: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -265,6 +289,11 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: 16,
     color: '#666666', // Secondary text color
     textAlign: 'center',
+  },
+  userInfo: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 5,
   },
   scrollContent: {
     flexGrow: 1,
@@ -436,14 +465,10 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: 'bold',
     color: '#1a1a1a',
   },
-  closeButton: {
+  modalCloseButton: {
     padding: 5,
   },
-  closeButtonText: {
-    fontSize: 20,
-    color: '#666666',
-  },
-  governorateItem: {
+  modalItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -451,10 +476,10 @@ const createStyles = (theme) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e5e5',
   },
-  selectedGovernorateItem: {
+  selectedModalItem: {
     backgroundColor: '#f5f5f5',
   },
-  colorPreview: {
+  modalItemColor: {
     width: 20,
     height: 20,
     borderRadius: 10,
@@ -462,12 +487,12 @@ const createStyles = (theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e5e5e5',
   },
-  governorateItemText: {
+  modalItemText: {
     flex: 1,
     fontSize: 18,
     color: '#1a1a1a',
   },
-  selectedGovernorateItemText: {
+  selectedModalItemText: {
     fontWeight: 'bold',
     color: '#5C2633',
   },
@@ -497,5 +522,15 @@ const createStyles = (theme) => StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: 'transparent',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    fontSize: 18,
+    color: '#666',
   },
 }); 

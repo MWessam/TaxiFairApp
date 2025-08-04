@@ -40,7 +40,8 @@ export default {
       ],
       "enableProguardInReleaseBuilds": true,
       "enableSeparateBuildPerCPUArchitecture": true,
-      "universalApk": false
+      "universalApk": false,
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -65,7 +66,20 @@ export default {
         {
           "android_app_id": "ca-app-pub-8401949226434611~5894350073"
         }
-      ]
+      ],
+      [
+        "expo-auth-session",
+        {
+          "scheme": "kam-el-ogra"
+        }
+      ],
+              [
+          "@react-native-google-signin/google-signin",
+          {
+            "iosUrlScheme": "com.MedoWessam.TaxiOgraApp",
+            "webClientId": "916645906844-lvuvah951bgu6jaqoa4hi5ioovcl4pcu.apps.googleusercontent.com"
+          }
+        ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -84,7 +98,8 @@ export default {
       "FIREBASE_MESSAGING_SENDER_ID": process.env.FIREBASE_MESSAGING_SENDER_ID,
       "FIREBASE_APP_ID": process.env.FIREBASE_APP_ID,
       "FIREBASE_MEASUREMENT_ID": process.env.FIREBASE_MEASUREMENT_ID,
-      "APP_CHECK_SITE_KEY": process.env.APP_CHECK_SITE_KEY
+      "APP_CHECK_SITE_KEY": process.env.APP_CHECK_SITE_KEY,
+      "GOOGLE_CLIENT_ID": process.env.GOOGLE_CLIENT_ID || "916645906844-lvuvah951bgu6jaqoa4hi5ioovcl4pcu.apps.googleusercontent.com"
     }
   }
 }

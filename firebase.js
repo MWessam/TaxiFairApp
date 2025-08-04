@@ -2,10 +2,22 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { initializeAuth, getReactNativePersistence, signInAnonymously } from "firebase/auth";
+import { 
+  initializeAuth, 
+  getReactNativePersistence, 
+  signInAnonymously,
+  GoogleAuthProvider,
+  signInWithCredential,
+  signOut,
+  onAuthStateChanged
+} from "firebase/auth";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { initializeAppCheck, ReCaptchaV3Provider, getAppCheck } from 'firebase/app-check';
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -40,6 +52,19 @@ export const auth = initializeAuth(app, {
   persistence: getReactNativePersistence(AsyncStorage)
 });
 
+// Initialize Google Sign-In
+GoogleSignin.configure({
+  webClientId: Constants.expoConfig?.extra?.GOOGLE_CLIENT_ID || "916645906844-lvuvah951bgu6jaqoa4hi5ioovcl4pcu.apps.googleusercontent.com",
+  offlineAccess: true,
+  hostedDomain: '',
+  forceCodeForRefreshToken: true,
+});
+
+// Google Auth Provider
+const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('profile');
+googleProvider.addScope('email');
+
 // Initialize anonymous authentication
 export const signInUserAnonymously = async () => {
   try {
@@ -57,6 +82,132 @@ export const signInUserAnonymously = async () => {
     console.log('Continuing without authentication...');
     return null;
   }
+};
+
+// Automatic Google Sign-In (Silent)
+export const signInWithGoogleSilent = async () => {
+  try {
+    // Check if Google Play Services is available
+    await GoogleSignin.hasPlayServices();
+    
+    // Try to get current user (automatic sign-in)
+    const currentUser = await GoogleSignin.getCurrentUser();
+    if (currentUser) {
+      // User is already signed in, get credentials
+      const { idToken } = await GoogleSignin.getTokens();
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      return userCredential.user;
+    }
+    
+    // Try silent sign-in
+    const userInfo = await GoogleSignin.signInSilently();
+    if (userInfo) {
+      const { idToken } = await GoogleSignin.getTokens();
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      return userCredential.user;
+    }
+    
+    return null; // No automatic sign-in available
+  } catch (error) {
+    console.log('Google automatic sign-in not available:', error.message);
+    return null; // Fall back to manual sign-in
+  }
+};
+
+// Manual Google Sign-In
+export const signInWithGoogle = async () => {
+  try {
+    // Check if Google Play Services is available
+    await GoogleSignin.hasPlayServices();
+    
+    // Manual sign-in
+    const userInfo = await GoogleSignin.signIn();
+    if (userInfo) {
+      const { idToken } = await GoogleSignin.getTokens();
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      return userCredential.user;
+    }
+    
+    throw new Error('Google sign-in was cancelled or failed');
+  } catch (error) {
+    console.error('Error signing in with Google:', error);
+    throw error;
+  }
+};
+
+// Legacy web-based Google Sign-In (for web/fallback)
+export const signInWithGoogleWeb = async () => {
+  try {
+    // Create a redirect URI for the auth session
+    const redirectUri = AuthSession.makeRedirectUri({
+      scheme: 'kam-el-ogra',
+      path: 'auth'
+    });
+
+    // Create the auth request
+    const request = new AuthSession.AuthRequest({
+      clientId: FIREBASE_API_KEY, // Use Firebase API key as client ID
+      scopes: ['openid', 'profile', 'email'],
+      redirectUri,
+      responseType: AuthSession.ResponseType.Code,
+      extraParams: {
+        prompt: 'select_account'
+      }
+    });
+
+    // Get the auth URL
+    const authUrl = await request.makeAuthUrlAsync();
+
+    // Open the browser for authentication
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+    if (result.type === 'success' && result.url) {
+      // Exchange the code for tokens
+      const tokenResult = await request.handleCodeExchangeAsync(result.url);
+      
+      if (tokenResult.type === 'success') {
+        // Create credential from Google tokens
+        const credential = GoogleAuthProvider.credential(
+          tokenResult.authentication.idToken,
+          tokenResult.authentication.accessToken
+        );
+
+        // Sign in to Firebase with the credential
+        const userCredential = await signInWithCredential(auth, credential);
+        return userCredential.user;
+      }
+    }
+
+    throw new Error('Google sign-in was cancelled or failed');
+  } catch (error) {
+    console.error('Error signing in with Google:', error);
+    throw error;
+  }
+};
+
+// Sign out function
+export const signOutUser = async () => {
+  try {
+    await signOut(auth);
+    // Also sign out from Google Sign-In
+    await GoogleSignin.signOut();
+  } catch (error) {
+    console.error('Error signing out:', error);
+    throw error;
+  }
+};
+
+// Get current user
+export const getCurrentUser = () => {
+  return auth.currentUser;
+};
+
+// Listen to auth state changes
+export const onAuthStateChange = (callback) => {
+  return onAuthStateChanged(auth, callback);
 };
 
 // Initialize Firebase App Check (web / Expo web). For native Expo, further setup may be required.

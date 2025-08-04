@@ -1,20 +1,19 @@
 // firestoreHelpers.js
 import { functions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
-import deviceIdService from './services/deviceIdService';
+import { getCurrentUser } from './firebase';
 
 export async function saveTrip(tripData) {
   try {
-    // No authentication – rely on App Check only
-    
-    // Get device ID for rate limiting
-    const deviceId = await deviceIdService.getDeviceId();
+    // Get current authenticated user
+    const currentUser = getCurrentUser();
+    const userId = currentUser?.uid || 'anonymous';
     
     // Call the secure Firebase Function
     const submitTrip = httpsCallable(functions, 'submitTrip');
     const result = await submitTrip({
       ...tripData,
-      device_id: deviceId
+      user_id: userId
     });
     
     return result.data; // Forward full response { success, status, ... }
@@ -26,10 +25,9 @@ export async function saveTrip(tripData) {
 
 export async function analyzeSimilarTrips(tripData) {
   try {
-    // No authentication – rely on App Check only
-    
-    // Get device ID for rate limiting
-    const deviceId = await deviceIdService.getDeviceId();
+    // Get current authenticated user
+    const currentUser = getCurrentUser();
+    const userId = currentUser?.uid || 'anonymous';
     
     // Call the secure Firebase Function
     const analyzeTrips = httpsCallable(functions, 'analyzeSimilarTrips');
@@ -42,7 +40,7 @@ export async function analyzeSimilarTrips(tripData) {
       distance: tripData.distance,
       startTime: tripData.start_time,
       governorate: tripData.governorate,
-      device_id: deviceId
+      user_id: userId
     };
 
     const result = await analyzeTrips(params);
