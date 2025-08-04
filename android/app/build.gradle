@@ -1,6 +1,9 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+// Temporarily disabled for debugging
+// apply plugin: 'com.google.gms.google-services'
+
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -92,7 +95,7 @@ android {
         applicationId 'com.MedoWessam.TaxiOgraApp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 33
+        versionCode 35
         versionName findProperty('versionName') ?: "1.0.12"
     }
     signingConfigs {
@@ -192,4 +195,5 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+    
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "916645906844",
+    "project_id": "taxifare-7fe53",
+    "storage_bucket": "taxifare-7fe53.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:916645906844:android:8c68e10bfe7ae49d04a059",
+        "android_client_info": {
+          "package_name": "com.MedoWessam.TaxiOgraApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrJy3_uShNSFAFxhPqO2cbjd_Hc06mQBs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
