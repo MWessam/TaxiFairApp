@@ -22,6 +22,7 @@ const tripSchema = z.object({
   to: coordSchema.optional(),
   start_time: z.string().optional(), // ISO string; additional checks in code
   governorate: z.string().optional(),
+  user_id: z.string().optional(), // User ID for validation and rate limiting
   
   // ML Model specific fields (will be derived from above data)
   time_of_day: z.number().int().min(0).max(23).optional(), // 0-23 hour

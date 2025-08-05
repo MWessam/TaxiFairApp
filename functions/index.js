@@ -23,12 +23,16 @@ admin.initializeApp();
 const db = admin.firestore();
 
 // Bot protection and rate limiting (Firestore-backed)
-const MAX_SUBMISSIONS_PER_HOUR = 20;  // More reasonable for mobile app users
-const MAX_SUBMISSIONS_PER_DAY = 100;  // More reasonable for mobile app users
+const MAX_SUBMISSIONS_PER_HOUR = 5;  // Updated: 5 trips per hour per user
+const MAX_SUBMISSIONS_PER_DAY = 20;  // Updated: 20 trips per day per user
 const OFFICIAL_TARIFF_BASE_FARE = 9;
 const OFFICIAL_TARIFF_PER_KM = 2;
 const OFFICIAL_TARIFF_MIN_PERCENT_MODIFIER = 0.15;
 const OFFICIAL_TARIFF_MAX_PERCENT_MODIFIER = 1.0;
+
+// New constants for trip validation
+const DUPLICATE_TRIP_TIME_WINDOW = 30 * 60 * 1000; // 30 minutes in milliseconds
+const SAME_ZONE_DESTINATION_WINDOW = 30 * 60 * 1000; // 30 minutes for same zone trips
 
 // Zone management is now handled by zone-manager.js
 
@@ -185,12 +189,203 @@ function validateTripFeasibility(tripData) {
   return errors;
 }
 
-async function checkRateLimit(identifier) {
+// Helper function to calculate distance between two points
+function calculateDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Check if user has admin role
+async function isAdminUser(userId) {
+  if (!userId) return false;
+  
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) return false;
+    
+    const userData = userDoc.data();
+    return userData.role === 'admin';
+  } catch (error) {
+    console.error('Error checking admin role:', error);
+    return false;
+  }
+}
+
+// Check for duplicate trips (same date, time, from/to locations)
+async function checkDuplicateTrip(tripData, userId) {
+  if (!userId || !tripData.start_time || !tripData.from || !tripData.to) {
+    return false; // Cannot check without required data
+  }
+  
+  try {
+    const startTime = new Date(tripData.start_time);
+    const tripDate = startTime.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // Query for trips with same date, from, and to locations
+    const snapshot = await db.collection('trips')
+      .where('user_id', '==', userId)
+      .where('date', '==', tripDate)
+      .where('from_zone', '==', tripData.from_zone)
+      .where('to_zone', '==', tripData.to_zone)
+      .get();
+    
+    if (snapshot.empty) return false;
+    
+    // Check if any trip is within the time window
+    for (const doc of snapshot.docs) {
+      const existingTrip = doc.data();
+      if (existingTrip.start_time) {
+        const existingStartTime = new Date(existingTrip.start_time);
+        const timeDiff = Math.abs(startTime.getTime() - existingStartTime.getTime());
+        
+        if (timeDiff <= DUPLICATE_TRIP_TIME_WINDOW) {
+          return true; // Duplicate found
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking duplicate trip:', error);
+    return false; // Allow trip if check fails
+  }
+}
+
+// Check for same zone to same destination within time window
+async function checkSameZoneDestination(tripData, userId) {
+  if (!userId || !tripData.start_time || !tripData.from_zone || !tripData.to_zone) {
+    return false; // Cannot check without required data
+  }
+  
+  // Only check if from and to zones are the same
+  if (tripData.from_zone !== tripData.to_zone) {
+    return false;
+  }
+  
+  try {
+    const startTime = new Date(tripData.start_time);
+    const thirtyMinutesAgo = new Date(startTime.getTime() - SAME_ZONE_DESTINATION_WINDOW);
+    
+    // Query for recent trips from same zone to same destination
+    const snapshot = await db.collection('trips')
+      .where('start_time', '>=', thirtyMinutesAgo.toISOString())
+      .where('user_id', '==', userId)
+      .where('from_zone', '==', tripData.from_zone)
+      .where('to_zone', '==', tripData.to_zone)
+      .get();
+    
+    return !snapshot.empty; // Return true if any recent trips found
+  } catch (error) {
+    console.error('Error checking same zone destination:', error);
+    return false; // Allow trip if check fails
+  }
+}
+
+// Get latest trip end time for a user (with caching)
+async function getLatestTripEndTime(userId) {
+  if (!userId) return null;
+  
+  try {
+    // Check cache first
+    const cacheKey = `latest_trip_end_${userId}`;
+    const cacheDoc = await db.collection('trip_cache').doc(cacheKey).get();
+    
+    if (cacheDoc.exists) {
+      const cacheData = cacheDoc.data();
+      const cacheTime = cacheData.timestamp.toMillis();
+      const now = Date.now();
+      
+      // Cache is valid for 1 hour
+      if (now - cacheTime < 60 * 60 * 1000) {
+        return cacheData.latest_end_time ? new Date(cacheData.latest_end_time) : null;
+      }
+    }
+    
+    // Query for latest trip
+    const snapshot = await db.collection('trips')
+      .where('user_id', '==', userId)
+      .orderBy('start_time', 'desc')
+      .limit(1)
+      .get();
+    
+    if (snapshot.empty) {
+      // Cache null result
+      await db.collection('trip_cache').doc(cacheKey).set({
+        latest_end_time: null,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      });
+      return null;
+    }
+    
+    const latestTrip = snapshot.docs[0].data();
+    let latestEndTime = null;
+    
+    if (latestTrip.start_time && latestTrip.duration) {
+      const startTime = new Date(latestTrip.start_time);
+      latestEndTime = new Date(startTime.getTime() + latestTrip.duration * 60 * 1000);
+    }
+    
+    // Cache the result
+    await db.collection('trip_cache').doc(cacheKey).set({
+      latest_end_time: latestEndTime ? latestEndTime.toISOString() : null,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+    
+    return latestEndTime;
+  } catch (error) {
+    console.error('Error getting latest trip end time:', error);
+    return null; // Allow trip if check fails
+  }
+}
+
+// Validate trip time feasibility
+async function validateTripTimeFeasibility(tripData, userId) {
+  if (!userId || !tripData.start_time) {
+    return { valid: true }; // Cannot validate without required data
+  }
+  
+  try {
+    const startTime = new Date(tripData.start_time);
+    const latestEndTime = await getLatestTripEndTime(userId);
+    
+    if (!latestEndTime) {
+      return { valid: true }; // No previous trips
+    }
+    
+    // Check if new trip starts before latest trip ends
+    if (startTime < latestEndTime) {
+      return {
+        valid: false,
+        error: `Trip conflicts with existing trip. Latest trip ends at ${latestEndTime.toLocaleString()}`,
+        latest_end_time: latestEndTime.toISOString()
+      };
+    }
+    
+    return { valid: true };
+  } catch (error) {
+    console.error('Error validating trip time feasibility:', error);
+    return { valid: true }; // Allow trip if validation fails
+  }
+}
+
+// Update rate limiting to use user_id instead of device_id
+async function checkRateLimit(userId) {
+  if (!userId) {
+    throw new Error('User ID is required for rate limiting');
+  }
+  
   const now = Date.now();
   const hourSlot = Math.floor(now / 3600000);
   const daySlot = Math.floor(now / 86400000);
 
-  const docRef = db.collection('rate_limits').doc(identifier);
+  const docRef = db.collection('rate_limits').doc(`user_${userId}`);
 
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(docRef);
@@ -214,10 +409,10 @@ async function checkRateLimit(identifier) {
     }
 
     if (hourCount >= MAX_SUBMISSIONS_PER_HOUR) {
-      throw new Error(`Rate limit exceeded: ${MAX_SUBMISSIONS_PER_HOUR} submissions per hour. Please wait before submitting more trips.`);
+      throw new Error(`Rate limit exceeded: ${MAX_SUBMISSIONS_PER_HOUR} trips per hour. Please wait before submitting more trips.`);
     }
     if (dayCount >= MAX_SUBMISSIONS_PER_DAY) {
-      throw new Error(`Rate limit exceeded: ${MAX_SUBMISSIONS_PER_DAY} submissions per day. Please try again tomorrow.`);
+      throw new Error(`Rate limit exceeded: ${MAX_SUBMISSIONS_PER_DAY} trips per day. Please try again tomorrow.`);
     }
 
     hourCount += 1;
@@ -286,28 +481,20 @@ exports.submitTrip = onCall({
   const { data } = request;
   const context = request.auth;
   try {
-    // No user authentication required – function protected by rate limiting only.
+    // Get user ID for validation
+    const userId = data.user_id || (context ? context.uid : null);
     
-    // Rate limiting based on device ID, user ID, or IP address
-    let identifier;
-    
-    // Priority order: device_id > user_id > ip_address
-    if (data.device_id && data.device_id.trim() !== '') {
-      identifier = `device_${data.device_id}`;
-    } else if (context && context.uid) {
-      identifier = `user_${context.uid}`;
-    } else if (request.ip) {
-      identifier = `ip_${hashIp(request.ip)}`;
-    } else {
-      identifier = 'unknown';
+    if (!userId) {
+      throw new Error('User ID is required for trip submission');
     }
     
-    if (!identifier || identifier === 'unknown') {
-      console.log('Unable to identify user for rate limiting');
-      // throw new Error('Unable to identify user for rate limiting');
-    }
+    // Check if user is admin (bypasses all restrictions)
+    const isAdmin = await isAdminUser(userId);
     
-    //await checkRateLimit(identifier);
+    if (!isAdmin) {
+      // Apply rate limiting for non-admin users
+      await checkRateLimit(userId);
+    }
     
     // Validate trip data using Zod schema
     const parseResult = tripSchema.safeParse(data);
@@ -318,6 +505,33 @@ exports.submitTrip = onCall({
     
     // Extract ML features from the trip data
     const mlFeatures = extractMLFeatures(data);
+    
+    // Add ML features to trip data for validation
+    const tripDataWithFeatures = {
+      ...data,
+      ...mlFeatures
+    };
+    
+    // Apply validation rules for non-admin users
+    if (!isAdmin) {
+      // Check for duplicate trips
+      const isDuplicate = await checkDuplicateTrip(tripDataWithFeatures, userId);
+      if (isDuplicate) {
+        throw new Error('Duplicate trip detected. A similar trip was submitted recently.');
+      }
+      
+      // Check for same zone to same destination within time window
+      const isSameZoneRecent = await checkSameZoneDestination(tripDataWithFeatures, userId);
+      if (isSameZoneRecent) {
+        throw new Error('Recent trip from same zone to same destination detected. Please wait 30 minutes.');
+      }
+      
+      // Validate trip time feasibility
+      const timeValidation = await validateTripTimeFeasibility(tripDataWithFeatures, userId);
+      if (!timeValidation.valid) {
+        throw new Error(timeValidation.error);
+      }
+    }
 
     // --- Official tariff validation ---
     const officialFare = OFFICIAL_TARIFF_BASE_FARE + OFFICIAL_TARIFF_PER_KM * data.distance;
@@ -349,7 +563,7 @@ exports.submitTrip = onCall({
     const tripData = {
       ...data,
       ...mlFeatures, // Include all ML features
-      user_id: context ? context.uid : 'anonymous',
+      user_id: userId,
       submitted_at: admin.firestore.FieldValue.serverTimestamp(),
       ip_address: hashIp(request.ip),
       user_agent: request.headers?.['user-agent'] || 'unknown',
@@ -357,11 +571,16 @@ exports.submitTrip = onCall({
       validation_status: validationStatus,
       official_fare: officialFare,
       min_allowed_fare: minAllowedFare,
-      max_allowed_fare: maxAllowedFare
+      max_allowed_fare: maxAllowedFare,
+      is_admin_submission: isAdmin
     };
 
-    // Save to Firestore regardless, but mark suspicious if needed
+    // Save to Firestore
     const docRef = await db.collection('trips').add(tripData);
+    
+    // Invalidate cache for this user
+    const cacheKey = `latest_trip_end_${userId}`;
+    await db.collection('trip_cache').doc(cacheKey).delete();
 
     return {
       success: true,
@@ -372,7 +591,8 @@ exports.submitTrip = onCall({
         : (validationStatus === 'below_min_fare'
             ? 'Fare below allowed minimum'
             : 'Fare above allowed maximum'),
-      ml_features: mlFeatures // Return ML features for debugging
+      ml_features: mlFeatures, // Return ML features for debugging
+      is_admin: isAdmin
     };
     
   } catch (error) {
@@ -403,27 +623,18 @@ exports.analyzeSimilarTrips = onCall({
   }
   
   try {
-    // No user authentication required – function protected by rate limiting only.
+    // Get user ID for rate limiting
+    const userId = data.user_id || (context ? context.uid : null);
     
-    // Rate limiting based on device ID, user ID, or IP address
-    let identifier;
-    
-    // Priority order: device_id > user_id > ip_address
-    if (data.device_id && data.device_id.trim() !== '') {
-      identifier = `device_${data.device_id}`;
-    } else if (context && context.uid) {
-      identifier = `user_${context.uid}`;
-    } else if (request.ip) {
-      identifier = `ip_${hashIp(request.ip)}`;
-    } else {
-      identifier = 'unknown';
+    if (userId) {
+      // Check if user is admin (bypasses rate limiting)
+      const isAdmin = await isAdminUser(userId);
+      
+      if (!isAdmin) {
+        // Apply rate limiting for non-admin users
+        await checkRateLimit(userId);
+      }
     }
-    
-    if (!identifier || identifier === 'unknown') {
-      //throw new Error('Unable to identify user for rate limiting');
-    }
-    
-    // await checkRateLimit(identifier);
     
     const { 
       fromLat, 
@@ -696,22 +907,12 @@ exports.analyzeSimilarTrips = onCall({
   }
 });
 
-// Helper function to calculate distance between two points
-function calculateDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLng/2) * Math.sin(dLng/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
+// Only essential functions - no export needed
 
-// Only essential functions - no zone management needed
-
-// Only essential functions - no testing needed
+function hashIp(ip) {
+  if (!ip) return 'unknown';
+  return crypto.createHash('sha256').update(ip).digest('hex');
+} 
 
 async function estimateFare(trips, requestData = null) {
   if (!trips || trips.length === 0) {
@@ -974,3 +1175,106 @@ function hashIp(ip) {
   if (!ip) return 'unknown';
   return crypto.createHash('sha256').update(ip).digest('hex');
 } 
+
+// Admin user management function
+exports.setUserRole = onCall({
+  memory: '256MiB',
+  timeoutSeconds: 30
+}, async (request) => {
+  const { data } = request;
+  const context = request.auth;
+  
+  try {
+    // Only allow authenticated users
+    if (!context || !context.uid) {
+      throw new Error('Authentication required');
+    }
+    
+    const { targetUserId, role } = data;
+    
+    if (!targetUserId || !role) {
+      throw new Error('Target user ID and role are required');
+    }
+    
+    // Check if current user is admin
+    const currentUserIsAdmin = await isAdminUser(context.uid);
+    if (!currentUserIsAdmin) {
+      throw new Error('Only admins can modify user roles');
+    }
+    
+    // Validate role
+    const validRoles = ['user', 'admin'];
+    if (!validRoles.includes(role)) {
+      throw new Error('Invalid role. Must be "user" or "admin"');
+    }
+    
+    // Set user role
+    await db.collection('users').doc(targetUserId).set({
+      role: role,
+      updated_by: context.uid,
+      updated_at: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    
+    return {
+      success: true,
+      message: `User role updated to ${role}`
+    };
+    
+  } catch (error) {
+    console.error('Error setting user role:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+// Function to get user's current role
+exports.getUserRole = onCall({
+  memory: '256MiB',
+  timeoutSeconds: 30
+}, async (request) => {
+  const { data } = request;
+  const context = request.auth;
+  
+  try {
+    // Only allow authenticated users
+    if (!context || !context.uid) {
+      throw new Error('Authentication required');
+    }
+    
+    const targetUserId = data.userId || context.uid;
+    
+    // Check if current user is admin or requesting their own role
+    const currentUserIsAdmin = await isAdminUser(context.uid);
+    if (!currentUserIsAdmin && targetUserId !== context.uid) {
+      throw new Error('You can only view your own role');
+    }
+    
+    const userDoc = await db.collection('users').doc(targetUserId).get();
+    
+    if (!userDoc.exists) {
+      return {
+        success: true,
+        role: 'user', // Default role
+        isAdmin: false
+      };
+    }
+    
+    const userData = userDoc.data();
+    const role = userData.role || 'user';
+    
+    return {
+      success: true,
+      role: role,
+      isAdmin: role === 'admin'
+    };
+    
+  } catch (error) {
+    console.error('Error getting user role:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}); 
