@@ -9,7 +9,141 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "to_zone",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "suspicious",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "submitted_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "distance",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fare",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "distance",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fare",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "from_zone",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "distance",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fare",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "to_zone",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "distance",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fare",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "from_zone",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "to_zone",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "distance",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fare",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "governorate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "distance",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fare",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "from_zone",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "governorate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "distance",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fare",
           "order": "ASCENDING"
         },
         {
@@ -17,8 +151,34 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "submitted_at",
-          "order": "DESCENDING"
+          "fieldPath": "governorate",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "distance",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fare",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "from_zone",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "to_zone",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "governorate",
+          "order": "ASCENDING"
         }
       ]
     }

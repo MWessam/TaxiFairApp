@@ -3,7 +3,7 @@ export default {
   "expo": {
     "name": "Kam El Ogra",
     "slug": "kam-el-ogra",
-    "version": "1.0.27",
+    "version": "1.0.28",
     "orientation": "portrait",
     "icon": "./assets/images/cair_icon_transparent.png",
     "scheme": "kam-el-ogra",
@@ -31,7 +31,7 @@ export default {
       },
       "edgeToEdgeEnabled": true,
       "package": "com.MedoWessam.TaxiOgraApp",
-      "versionCode": 37,
+      "versionCode": 38,
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_BACKGROUND_LOCATION",
@@ -68,18 +68,12 @@ export default {
         }
       ],
       [
-        "expo-auth-session",
+        "@react-native-google-signin/google-signin",
         {
-          "scheme": "kam-el-ogra"
+          "iosUrlScheme": "com.MedoWessam.TaxiOgraApp",
+          "webClientId": "916645906844-lvuvah951bgu6jaqoa4hi5ioovcl4pcu.apps.googleusercontent.com"
         }
-      ],
-              [
-          "@react-native-google-signin/google-signin",
-          {
-            "iosUrlScheme": "com.MedoWessam.TaxiOgraApp",
-            "webClientId": "916645906844-lvuvah951bgu6jaqoa4hi5ioovcl4pcu.apps.googleusercontent.com"
-          }
-        ]
+      ]
     ],
     "experiments": {
       "typedRoutes": true

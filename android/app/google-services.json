@@ -12,7 +12,28 @@
           "package_name": "com.MedoWessam.TaxiOgraApp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "916645906844-94s754hqopj6oq7nf5efpbokvafod9kc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.MedoWessam.TaxiOgraApp",
+            "certificate_hash": "3e2ffd372c3b1b3845b6614a53aba7cff05142df"
+          }
+        },
+        {
+          "client_id": "916645906844-irhqjgkdv68ro7sjfaepd6p28j2la8cc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.MedoWessam.TaxiOgraApp",
+            "certificate_hash": "bf813c9e44f6c26a0e5ddb858344ef3537c1a7be"
+          }
+        },
+        {
+          "client_id": "916645906844-lvuvah951bgu6jaqoa4hi5ioovcl4pcu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDrJy3_uShNSFAFxhPqO2cbjd_Hc06mQBs"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "916645906844-lvuvah951bgu6jaqoa4hi5ioovcl4pcu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

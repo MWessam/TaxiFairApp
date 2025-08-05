@@ -498,14 +498,23 @@ exports.analyzeSimilarTrips = onCall({
       });
     }
 
+    // Convert coordinates to zones
+    const fromZone = fromLat && fromLng ? getZoneManager().getZoneFromCoordinates(fromLat, fromLng) : null;
+    const toZone = toLat && toLng ? getZoneManager().getZoneFromCoordinates(toLat, toLng) : null;
+
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Zone calculations:', { fromZone, toZone });
+    }
+
     // Query for similar trips (server-side only)
     let tripsQuery = db.collection('trips')
+      .where('from_zone', '==', fromZone)
+      .where('to_zone', '==', toZone)
       .where('distance', '>=', distanceRangeStart)
       .where('distance', '<=', distanceRangeEnd)
-      .where('fare', '>', 0)
-      .where('to_zone', '==', toZone)
-      .where('from_zone', '==', fromZone);
+      .where('fare', '>', 0);
       // Note: We'll filter suspicious trips in application logic to include records without suspicious field
+
 
     if (process.env.DEBUG_LOGS === 'true') {
       console.log('Base query created with filters:', {

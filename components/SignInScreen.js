@@ -1,38 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useTheme } from '@/constants/ThemeContext';
 import { useAuth } from '@/constants/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import Constants from 'expo-constants';
-
-WebBrowser.maybeCompleteAuthSession();
 
 export default function SignInScreen() {
   const { theme } = useTheme();
   const { signInAnonymously, signInWithGoogle, loading } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
 
-  // Get Google client ID from config
-  const googleClientId = Constants.expoConfig?.extra?.GOOGLE_CLIENT_ID || '916645906844-lvuvah951bgu6jaqoa4hi5ioovcl4pcu.apps.googleusercontent.com';
-
-  // Google OAuth configuration
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: googleClientId,
-    iosClientId: googleClientId,
-    webClientId: googleClientId,
-    expoClientId: googleClientId,
-  });
-
-  // Handle Google sign-in response
-  useEffect(() => {
-    if (response?.type === 'success') {
-      handleGoogleSignIn(response.authentication);
-    }
-  }, [response]);
-
-  const handleGoogleSignIn = async (authentication) => {
+  const handleGoogleSignIn = async () => {
     try {
       setIsSigningIn(true);
       const result = await signInWithGoogle();
@@ -57,18 +34,6 @@ export default function SignInScreen() {
     } catch (error) {
       console.error('Anonymous sign-in error:', error);
       Alert.alert('خطأ في تسجيل الدخول', 'حدث خطأ أثناء تسجيل الدخول المجهول');
-    } finally {
-      setIsSigningIn(false);
-    }
-  };
-
-  const handleGoogleSignInPress = async () => {
-    try {
-      setIsSigningIn(true);
-      await promptAsync();
-    } catch (error) {
-      console.error('Error prompting Google sign-in:', error);
-      Alert.alert('خطأ', 'حدث خطأ أثناء فتح نافذة تسجيل الدخول');
     } finally {
       setIsSigningIn(false);
     }
@@ -113,7 +78,7 @@ export default function SignInScreen() {
           {/* Google Sign In Button (Primary) */}
           <TouchableOpacity
             style={[styles.googleButton, { opacity: isSigningIn ? 0.6 : 1 }]}
-            onPress={handleGoogleSignInPress}
+            onPress={handleGoogleSignIn}
             disabled={isSigningIn || loading}
           >
             {isSigningIn ? (

@@ -14,8 +14,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { initializeAppCheck, ReCaptchaV3Provider, getAppCheck } from 'firebase/app-check';
-import * as AuthSession from 'expo-auth-session';
-import * as WebBrowser from 'expo-web-browser';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 // TODO: Add SDKs for Firebase products that you want to use
@@ -58,6 +56,7 @@ GoogleSignin.configure({
   offlineAccess: true,
   hostedDomain: '',
   forceCodeForRefreshToken: true,
+  scopes: ['profile', 'email'],
 });
 
 // Google Auth Provider
@@ -120,7 +119,14 @@ export const signInWithGoogleSilent = async () => {
 export const signInWithGoogle = async () => {
   try {
     // Check if Google Play Services is available
-    await GoogleSignin.hasPlayServices();
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    
+    // Check if user is already signed in
+    const isSignedIn = await GoogleSignin.isSignedIn();
+    if (isSignedIn) {
+      // Sign out first to ensure clean state
+      await GoogleSignin.signOut();
+    }
     
     // Manual sign-in
     const userInfo = await GoogleSignin.signIn();
@@ -134,56 +140,20 @@ export const signInWithGoogle = async () => {
     throw new Error('Google sign-in was cancelled or failed');
   } catch (error) {
     console.error('Error signing in with Google:', error);
-    throw error;
-  }
-};
-
-// Legacy web-based Google Sign-In (for web/fallback)
-export const signInWithGoogleWeb = async () => {
-  try {
-    // Create a redirect URI for the auth session
-    const redirectUri = AuthSession.makeRedirectUri({
-      scheme: 'kam-el-ogra',
-      path: 'auth'
-    });
-
-    // Create the auth request
-    const request = new AuthSession.AuthRequest({
-      clientId: FIREBASE_API_KEY, // Use Firebase API key as client ID
-      scopes: ['openid', 'profile', 'email'],
-      redirectUri,
-      responseType: AuthSession.ResponseType.Code,
-      extraParams: {
-        prompt: 'select_account'
-      }
-    });
-
-    // Get the auth URL
-    const authUrl = await request.makeAuthUrlAsync();
-
-    // Open the browser for authentication
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
-
-    if (result.type === 'success' && result.url) {
-      // Exchange the code for tokens
-      const tokenResult = await request.handleCodeExchangeAsync(result.url);
-      
-      if (tokenResult.type === 'success') {
-        // Create credential from Google tokens
-        const credential = GoogleAuthProvider.credential(
-          tokenResult.authentication.idToken,
-          tokenResult.authentication.accessToken
-        );
-
-        // Sign in to Firebase with the credential
-        const userCredential = await signInWithCredential(auth, credential);
-        return userCredential.user;
-      }
+    
+    // Handle specific error types
+    if (error.code === 'SIGN_IN_CANCELLED') {
+      throw new Error('Sign-in was cancelled by user');
+    } else if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
+      throw new Error('Google Play Services not available');
+    } else if (error.code === 'SIGN_IN_REQUIRED') {
+      throw new Error('Sign-in required');
+    } else if (error.code === 'INVALID_ACCOUNT') {
+      throw new Error('Invalid account');
+    } else if (error.code === 'SIGN_IN_FAILED') {
+      throw new Error('Sign-in failed - please try again');
     }
-
-    throw new Error('Google sign-in was cancelled or failed');
-  } catch (error) {
-    console.error('Error signing in with Google:', error);
+    
     throw error;
   }
 };

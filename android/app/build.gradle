@@ -95,7 +95,7 @@ android {
         applicationId 'com.MedoWessam.TaxiOgraApp'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 37
+        versionCode 38
         versionName findProperty('versionName') ?: "1.0.12"
     }
     signingConfigs {

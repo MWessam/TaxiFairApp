@@ -138,7 +138,18 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Failed to sign in with Google' };
     } catch (error) {
       console.error('Error signing in with Google:', error);
-      return { success: false, error: error.message };
+      
+      // Provide more specific error messages
+      let errorMessage = error.message;
+      if (error.message.includes('non recoverable')) {
+        errorMessage = 'Google Sign-In is not available. Please check your Google account settings or try again later.';
+      } else if (error.message.includes('network')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.message.includes('cancelled')) {
+        errorMessage = 'Sign-in was cancelled.';
+      }
+      
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
