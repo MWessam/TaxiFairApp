@@ -260,18 +260,18 @@ export default function PlacePicker() {
       setIsAddressLoading(true);
       setPinAddress('...');
       
-      // Debounce the reverse geocoding to avoid too many API calls
-      const timeoutId = setTimeout(() => {
-        console.log('Reverse geocoding for:', mapPin); // Debug log
-        reverseGeocode(mapPin.latitude, mapPin.longitude).then(address => {
-          setPinAddress(address || 'موقع غير محدد');
-          setIsAddressLoading(false);
-        }).catch(err => {
-          console.error('Reverse geocoding error:', err);
-          setPinAddress('موقع غير محدد');
-          setIsAddressLoading(false);
-        });
-      }, 300);
+             // Debounce the reverse geocoding to avoid too many API calls
+       const timeoutId = setTimeout(() => {
+         console.log('Reverse geocoding for:', mapPin); // Debug log
+         reverseGeocode(mapPin.latitude, mapPin.longitude).then(address => {
+           setPinAddress(address || 'موقع غير محدد');
+           setIsAddressLoading(false);
+         }).catch(err => {
+           console.error('Reverse geocoding error:', err);
+           setPinAddress('موقع غير محدد');
+           setIsAddressLoading(false);
+         });
+       }, 150);
 
       return () => clearTimeout(timeoutId);
     }
@@ -403,11 +403,19 @@ export default function PlacePicker() {
               </Text>
 
               <View style={styles.mapButtonsRow}>
-                <TouchableOpacity style={styles.mapCancelButton} onPress={() => setShowMap(false)}>
-                  <Text style={styles.mapCancelButtonText}>إلغاء</Text>
+                <TouchableOpacity 
+                  style={[styles.mapCancelButton, isAddressLoading && styles.disabledButton]} 
+                  onPress={() => setShowMap(false)}
+                  disabled={isAddressLoading}
+                >
+                  <Text style={[styles.mapCancelButtonText, isAddressLoading && styles.disabledButtonText]}>إلغاء</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.mapConfirmButton} onPress={handleMapLocationSelect}>
-                  <Text style={styles.mapConfirmButtonText}>تأكيد الموقع</Text>
+                <TouchableOpacity 
+                  style={[styles.mapConfirmButton, isAddressLoading && styles.disabledButton]} 
+                  onPress={handleMapLocationSelect}
+                  disabled={isAddressLoading}
+                >
+                  <Text style={[styles.mapConfirmButtonText, isAddressLoading && styles.disabledButtonText]}>تأكيد الموقع</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -853,5 +861,11 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#FFFFFF',
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  disabledButtonText: {
+    opacity: 0.7,
   },
 });

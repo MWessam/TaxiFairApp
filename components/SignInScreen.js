@@ -98,7 +98,7 @@ export default function SignInScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Anonymous Sign In Button */}
+          {/* Anonymous Sign In Button
           <TouchableOpacity
             style={[styles.anonymousButton, { opacity: isSigningIn ? 0.6 : 1 }]}
             onPress={handleAnonymousSignIn}
@@ -112,7 +112,7 @@ export default function SignInScreen() {
                 <Text style={styles.anonymousButtonText}>استمر كزائر</Text>
               </>
             )}
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         {/* Info Text */}
