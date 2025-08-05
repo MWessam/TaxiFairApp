@@ -7,7 +7,16 @@ export async function saveTrip(tripData) {
   try {
     // Get current authenticated user
     const currentUser = getCurrentUser();
-    const userId = currentUser?.uid || 'anonymous';
+    
+    if (!currentUser) {
+      return { 
+        success: false, 
+        error: 'User not authenticated',
+        requiresAuth: true 
+      };
+    }
+    
+    const userId = currentUser.uid;
     
     // Call the secure Firebase Function
     const submitTrip = httpsCallable(functions, 'submitTrip');
@@ -19,6 +28,16 @@ export async function saveTrip(tripData) {
     return result.data; // Forward full response { success, status, ... }
   } catch (error) {
     console.error('Error saving trip:', error);
+    
+    // Check if error is related to authentication
+    if (error.message?.includes('unauthenticated') || error.message?.includes('permission-denied')) {
+      return { 
+        success: false, 
+        error: 'Authentication required',
+        requiresAuth: true 
+      };
+    }
+    
     return { success: false, error: error.message };
   }
 }
@@ -27,7 +46,16 @@ export async function analyzeSimilarTrips(tripData) {
   try {
     // Get current authenticated user
     const currentUser = getCurrentUser();
-    const userId = currentUser?.uid || 'anonymous';
+    
+    if (!currentUser) {
+      return { 
+        success: false, 
+        error: 'User not authenticated',
+        requiresAuth: true 
+      };
+    }
+    
+    const userId = currentUser.uid;
     
     // Call the secure Firebase Function
     const analyzeTrips = httpsCallable(functions, 'analyzeSimilarTrips');
@@ -47,7 +75,17 @@ export async function analyzeSimilarTrips(tripData) {
     return result.data;
   } catch (error) {
     console.error('Error analyzing similar trips:', error);
-    return null;
+    
+    // Check if error is related to authentication
+    if (error.message?.includes('unauthenticated') || error.message?.includes('permission-denied')) {
+      return { 
+        success: false, 
+        error: 'Authentication required',
+        requiresAuth: true 
+      };
+    }
+    
+    return { success: false, error: error.message };
   }
 }
 

@@ -6,6 +6,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { getRouteDistanceORS, getGovernorateFromCoords } from '../../routeHelpers';
 import { saveTrip } from '../../firestoreHelpers';
 import { useTheme } from '@/constants/ThemeContext';
+import { useAuth } from '@/constants/AuthContext';
 import locationService from '../../services/locationService';
 import adService from '../../services/adService';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +18,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
   const routeParams = useLocalSearchParams();
   
   const { theme } = useTheme();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
 
   const [from, setFrom] = useState({ address: '', lat: null, lng: null });
   const [to, setTo] = useState({ address: '', lat: null, lng: null });
@@ -185,7 +187,27 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
         if (!response.success) {
           setLoading(false);
           console.log('Error saving trip:', response);
-          // Alert.alert('حدث خطأ أثناء حفظ الرحلة');
+          
+          // Handle authentication errors
+          if (response.requiresAuth) {
+            Alert.alert(
+              'تسجيل الدخول مطلوب',
+              'يجب تسجيل الدخول لحفظ رحلاتك',
+              [
+                {
+                  text: 'إلغاء',
+                  style: 'cancel'
+                },
+                {
+                  text: 'تسجيل الدخول',
+                  onPress: () => router.push('/(other)/SignInScreen')
+                }
+              ]
+            );
+            return;
+          }
+          
+          Alert.alert('حدث خطأ أثناء حفظ الرحلة', response.error || 'حدث خطأ غير متوقع');
           return;
         }
         
@@ -313,6 +335,62 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
     });
   };
 
+  // Check authentication on component mount
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      Alert.alert(
+        'تسجيل الدخول مطلوب',
+        'يجب تسجيل الدخول لحفظ رحلاتك',
+        [
+          {
+            text: 'إلغاء',
+            style: 'cancel',
+            onPress: () => router.back()
+          },
+          {
+            text: 'تسجيل الدخول',
+            onPress: () => router.push('/(other)/SignInScreen')
+          }
+        ]
+      );
+    }
+  }, [isAuthenticated, authLoading]);
+
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+        <Text style={[styles.loadingText, { marginTop: 16 }]}>جاري التحقق من تسجيل الدخول...</Text>
+      </View>
+    );
+  }
+
+  // Show sign-in prompt if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+        <Ionicons name="lock-closed" size={64} color={theme.textSecondary} />
+        <Text style={styles.authRequiredTitle}>تسجيل الدخول مطلوب</Text>
+        <Text style={styles.authRequiredText}>
+          يجب تسجيل الدخول لحفظ رحلاتك ومشاركة البيانات
+        </Text>
+        <TouchableOpacity
+          style={styles.authButton}
+          onPress={() => router.push('/(other)/SignInScreen')}
+        >
+          <Text style={styles.authButtonText}>تسجيل الدخول</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>العودة</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   const styles = createStyles(theme);
   const isFormComplete = from.address && to.address && (isEstimateMode || fare);
 
@@ -330,6 +408,14 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
           <Text style={styles.headerTitle}>
             {isEstimateMode ? 'تقدير سعر الرحلة' : 'إضافة رحلة'}
           </Text>
+          {user && (
+            <View style={styles.userInfo}>
+              <Ionicons name="person-circle" size={16} color={theme.textSecondary} />
+              <Text style={styles.userText}>
+                {user.displayName || (user.isAnonymous ? 'زائر' : 'مستخدم')}
+              </Text>
+            </View>
+          )}
           <View style={styles.headerSpacer} />
         </View>
       </View>
@@ -703,5 +789,52 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.textSecondary,
     textAlign: 'center',
     marginTop: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: theme.textSecondary,
+  },
+  authRequiredTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.text,
+    marginTop: 16,
+  },
+  authRequiredText: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  authButton: {
+    backgroundColor: theme.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    width: '80%',
+    marginBottom: 16,
+  },
+  authButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: theme.textSecondary,
+    textDecorationLine: 'underline',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  userText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginLeft: 4,
   },
 });

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { saveTrip, analyzeSimilarTrips } from '../../firestoreHelpers';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/constants/ThemeContext';
+import { useAuth } from '@/constants/AuthContext';
 import { useFavorites } from '@/constants/FavoritesContext';
 import adService from '../../services/adService';
 
@@ -15,6 +16,7 @@ export default function FareResults() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const { theme } = useTheme();
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   const { addFavorite } = useFavorites();
 
   const [paidFare, setPaidFare] = useState(params.paidFare || '');
@@ -25,6 +27,62 @@ export default function FareResults() {
   const [validationStatus, setValidationStatus] = useState(params.status || null);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [addingToFavorites, setAddingToFavorites] = useState(false);
+
+  // Check authentication on component mount
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      Alert.alert(
+        'تسجيل الدخول مطلوب',
+        'يجب تسجيل الدخول لحفظ رحلاتك',
+        [
+          {
+            text: 'إلغاء',
+            style: 'cancel',
+            onPress: () => router.back()
+          },
+          {
+            text: 'تسجيل الدخول',
+            onPress: () => router.push('/(other)/SignInScreen')
+          }
+        ]
+      );
+    }
+  }, [isAuthenticated, authLoading]);
+
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+        <Text style={[styles.loadingText, { marginTop: 16 }]}>جاري التحقق من تسجيل الدخول...</Text>
+      </View>
+    );
+  }
+
+  // Show sign-in prompt if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+        <Ionicons name="lock-closed" size={64} color={theme.textSecondary} />
+        <Text style={styles.authRequiredTitle}>تسجيل الدخول مطلوب</Text>
+        <Text style={styles.authRequiredText}>
+          يجب تسجيل الدخول لحفظ رحلاتك ومشاركة البيانات
+        </Text>
+        <TouchableOpacity
+          style={styles.authButton}
+          onPress={() => router.push('/(other)/SignInScreen')}
+        >
+          <Text style={styles.authButtonText}>تسجيل الدخول</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>العودة</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   useEffect(() => {
     if (!params.paidFare) {
@@ -71,6 +129,19 @@ export default function FareResults() {
           console.log('No estimated fare in data');
         }
         console.log(analysis);
+      } else if (analysis && analysis.requiresAuth) {
+        console.log('Analysis requires authentication:', analysis);
+        // Create a fallback structure for unauthenticated users
+        analysis = {
+          success: false,
+          requiresAuth: true,
+          data: {
+            estimatedFare: 0,
+            similarTripsCount: 0,
+            averageFare: 0,
+            fareRange: { min: 0, max: 0 }
+          }
+        };
       } else {
         console.log('Analysis failed or returned no data:', analysis);
         // Create a fallback structure
@@ -108,12 +179,29 @@ export default function FareResults() {
         tripData.fare = Number(inputValue);
         
         const response = await saveTrip(tripData);
-        if (response && response.status) {
+        if (response && response.success && response.status) {
           console.log('Response:', response);
           console.log('Status:', response.status);
           setValidationStatus(response.status);
           // Only show results after we get the validation status
           setShowResults(true);
+        } else if (response && response.requiresAuth) {
+          Alert.alert(
+            'تسجيل الدخول مطلوب',
+            'يجب تسجيل الدخول لحفظ رحلاتك',
+            [
+              {
+                text: 'إلغاء',
+                style: 'cancel'
+              },
+              {
+                text: 'تسجيل الدخول',
+                onPress: () => router.push('/(other)/SignInScreen')
+              }
+            ]
+          );
+        } else if (response && !response.success) {
+          Alert.alert('حدث خطأ أثناء حفظ الرحلة', response.error || 'حدث خطأ غير متوقع');
         }
       } catch (error) {
         console.error('Error saving trip:', error);
@@ -333,6 +421,14 @@ export default function FareResults() {
             <Ionicons name="arrow-forward" size={20} color={theme.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>نتائج الرحلة</Text>
+          {user && (
+            <View style={styles.userInfo}>
+              <Ionicons name="person-circle" size={16} color={theme.textSecondary} />
+              <Text style={styles.userText}>
+                {user.displayName || (user.isAnonymous ? 'زائر' : 'مستخدم')}
+              </Text>
+            </View>
+          )}
           <View style={styles.headerSpacer} />
         </View>
       </View>
@@ -910,5 +1006,45 @@ const createStyles = (theme) => StyleSheet.create({
     fontSize: 14,
     color: theme.textSecondary,
     marginBottom: 2,
+  },
+  authRequiredTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.text,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  authRequiredText: {
+    fontSize: 16,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  authButton: {
+    backgroundColor: theme.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  authButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: theme.primary,
+    fontWeight: 'bold',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  userText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    marginLeft: 4,
   },
 }); 
