@@ -1,5 +1,16 @@
-# Netlify redirects for SPA
-/*    /index.html   200
+# Strip Facebook click ID
+/* /index.html 200!  # Standard SPA handling
+
+# Remove fbclid, gclid, utm params globally
+# This rule matches any path and ignores certain query parameters
+/* /:splat 301! query=fbclid
+/* /:splat 301! query=gclid
+/* /:splat 301! query=utm_source
+/* /:splat 301! query=utm_medium
+/* /:splat 301! query=utm_campaign
+/* /:splat 301! query=utm_term
+/* /:splat 301! query=utm_content
+
 
 # Ensure crawlers can access the site
 /robots.txt   /robots.txt   200
