@@ -31,7 +31,7 @@ export const AD_CONFIG = {
       publisherId: 'ca-pub-8401949226434611', // ← Your actual Publisher ID
       banner: {
         // Standard banner ad unit
-        slot: 'YYYYYYYYYY', // ← Replace with YOUR Ad Unit ID
+        slot: '6808201836', // ← Your actual Ad Unit ID
         format: 'auto',
         responsive: true,
       },
