@@ -3,6 +3,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } fro
 import { useFonts } from 'expo-font';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Head } from 'expo-router/head';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
@@ -92,6 +93,14 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <Head>
+        <meta name="google-adsense-account" content="ca-pub-8401949226434611" />
+        <meta name="description" content="حاسبة أجرة التاكسي في مصر - احسب تكلفة رحلتك بدقة عالية مع تتبع مباشر للمسافة والوقت" />
+        <meta name="keywords" content="تاكسي, أجرة, حاسبة, مصر, القاهرة, النقل, رحلة, تكلفة" />
+        <meta name="author" content="Kam El Ogra" />
+        <meta name="robots" content="index, follow" />
+        <title>كم الأجرة - حاسبة أجرة التاكسي</title>
+      </Head>
       <AuthProvider>
         <ThemeProvider>
           <FavoritesProvider>
