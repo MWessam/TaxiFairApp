@@ -14,14 +14,15 @@ class AdService {
     this.interstitialAd = null;
     this.adCount = 0;
     this.lastAdTime = 0;
+    this.hasShownLaunchAd = false; // Track if we've shown the launch ad
     
     // Ad configuration - adjust these for your needs
     this.config = {
       // Minimum time between interstitial ads (in milliseconds)
-      minAdInterval: 60000, // 1 minute
+      minAdInterval: 30000, // 1 minute
       
       // Maximum ads per session
-      maxAdsPerSession: 3,
+      maxAdsPerSession: 5, // Increased for more ad opportunities
       
       // Test IDs for development
       testIds: {
@@ -58,6 +59,12 @@ class AdService {
       
       this.isInitialized = true;
       console.log('AdService: Initialized successfully');
+      
+      // Show launch ad after a short delay to ensure app is fully loaded
+      setTimeout(() => {
+        this.showLaunchAd();
+      }, 2000); // 2 second delay after initialization
+      
     } catch (error) {
       console.error('AdService: Initialization failed:', error);
       // Don't throw the error, just log it and continue
@@ -65,7 +72,21 @@ class AdService {
     }
   }
 
-
+  // Show interstitial ad on app launch
+  async showLaunchAd() {
+    if (this.hasShownLaunchAd) {
+      console.log('AdService: Launch ad already shown this session');
+      return false;
+    }
+    
+    console.log('AdService: Showing launch ad...');
+    const success = await this.showInterstitialAd();
+    if (success) {
+      this.hasShownLaunchAd = true;
+      console.log('AdService: Launch ad shown successfully');
+    }
+    return success;
+  }
 
   getAdUnitId(type) {
     // Use production IDs for real ads
@@ -174,6 +195,7 @@ class AdService {
   resetAdCount() {
     this.adCount = 0;
     this.lastAdTime = 0;
+    this.hasShownLaunchAd = false; // Reset launch ad flag for new session
     console.log('AdService: Ad count reset');
   }
 

@@ -526,11 +526,11 @@ exports.submitTrip = onCall({
         throw new Error('Recent trip from same zone to same destination detected. Please wait 30 minutes.');
       }
       
-      // Validate trip time feasibility
-      const timeValidation = await validateTripTimeFeasibility(tripDataWithFeatures, userId);
-      if (!timeValidation.valid) {
-        throw new Error(timeValidation.error);
-      }
+      // // Validate trip time feasibility
+      // const timeValidation = await validateTripTimeFeasibility(tripDataWithFeatures, userId);
+      // if (!timeValidation.valid) {
+      //   throw new Error(timeValidation.error);
+      // }
     }
 
     // --- Official tariff validation ---

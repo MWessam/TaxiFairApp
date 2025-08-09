@@ -588,6 +588,7 @@ const createStyles = (theme) => StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    paddingBottom: 60, // Add padding for banner ad
   },
   searchSection: {
     padding: 16,

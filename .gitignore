@@ -40,3 +40,7 @@ app-example
 
 # credentials
 credentials/
+
+android/app/build
+
+builds/

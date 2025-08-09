@@ -38,15 +38,18 @@ export const AD_CONFIG = {
     minAdInterval: 60000, // 1 minute
     
     // Maximum ads per session
-    maxAdsPerSession: 3,
+    maxAdsPerSession: 5, // Increased for more ad opportunities
     
-             // Show ads after specific actions
-         showWhenGoingBackFromResults: true,
-         showAfterTripEstimation: true,
-         showAfterAppLaunch: false, // Don't show immediately on launch
+    // Show ads after specific actions
+    showWhenGoingBackFromResults: true,
+    showAfterTripEstimation: true,
+    showAfterAppLaunch: true, // Show ads immediately on launch
     
     // Banner ad settings
     bannerRefreshInterval: 60000, // 1 minute
+    
+    // Show banner ads on all screens
+    showBannerOnAllScreens: true,
   },
 };
 

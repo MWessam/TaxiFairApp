@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useTheme } from '@/constants/ThemeContext';
 import { useAuth } from '@/constants/AuthContext';
+import BannerAdComponent from './BannerAdComponent';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SignInScreen() {
@@ -136,6 +137,9 @@ export default function SignInScreen() {
           </View>
         </View>
       </View>
+
+      {/* Banner Ad */}
+      <BannerAdComponent containerStyle={styles.bannerAdContainer} />
     </View>
   );
 }
@@ -175,6 +179,14 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     justifyContent: 'center',
+    paddingBottom: 60, // Add padding for banner ad
+  },
+  bannerAdContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
   },
   logoContainer: {
     alignItems: 'center',

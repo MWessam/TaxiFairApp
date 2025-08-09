@@ -1065,7 +1065,7 @@ const styles = StyleSheet.create({
   },
   bottomModal: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 60, // Add padding for banner ad
     left: 0,
     right: 0,
     padding: 16,

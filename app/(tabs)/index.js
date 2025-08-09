@@ -10,8 +10,8 @@ import { configureMapbox } from '@/mapboxProvider';
 import LocationPermissionRequest from '../../components/LocationPermissionRequest';
 import SignInScreen from '../../components/SignInScreen';
 import locationService from '../../services/locationService';
-import BannerAdComponent from '../../components/BannerAdComponent';
 import adService from '../../services/adService';
+import BannerAdComponent from '../../components/BannerAdComponent';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
@@ -198,9 +198,6 @@ export default function Home() {
         </View>
       </ScrollView>
 
-      {/* Banner Ad */}
-      <BannerAdComponent containerStyle={styles.bannerAdContainer} />
-
       {/* Governorate Selection Modal */}
       <Modal
         visible={showGovernorateModal}
@@ -247,6 +244,9 @@ export default function Home() {
           </View>
         </View>
       </Modal>
+
+      {/* Banner Ad */}
+      <BannerAdComponent containerStyle={styles.bannerAdContainer} />
     </View>
   );
 }
@@ -298,6 +298,14 @@ const createStyles = (theme) => StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    paddingBottom: 60, // Add padding for banner ad
+  },
+  bannerAdContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
   },
   mainContent: {
     flex: 1,
@@ -515,13 +523,6 @@ const createStyles = (theme) => StyleSheet.create({
     color: '#8B4513',
     fontWeight: '600',
     textAlign: 'center',
-  },
-  bannerAdContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'transparent',
   },
   loadingContainer: {
     flex: 1,

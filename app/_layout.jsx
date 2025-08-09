@@ -5,6 +5,7 @@ import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemeProvider } from '@/constants/ThemeContext';
@@ -14,6 +15,19 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { setupNotificationHandler, getPendingFareResults } from '../services/backgroundTracking';
 import locationService from '../services/locationService';
 import adService from '../services/adService';
+import BannerAdComponent from '../components/BannerAdComponent';
+
+// Wrapper component to add banner ads to all screens
+const ScreenWrapper = ({ children }) => {
+  return (
+    <View style={styles.screenWrapper}>
+      <View style={styles.content}>
+        {children}
+      </View>
+      <BannerAdComponent containerStyle={styles.bannerAdContainer} />
+    </View>
+  );
+};
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -111,3 +125,19 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  screenWrapper: {
+    flex: 1,
+  },
+  content: {
+    flex: 1,
+  },
+  bannerAdContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
+  },
+});

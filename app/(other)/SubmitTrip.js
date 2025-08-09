@@ -9,6 +9,7 @@ import { useTheme } from '@/constants/ThemeContext';
 import { useAuth } from '@/constants/AuthContext';
 import locationService from '../../services/locationService';
 import adService from '../../services/adService';
+import BannerAdComponent from '../../components/BannerAdComponent';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
@@ -242,7 +243,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
       
       // Show ad after trip estimation (not tracking)
       if (isEstimateMode) {
-        await adService.showAdAfterTripEstimation();
+        // await adService.showAdAfterTripEstimation();
       }
       
       // Navigate to FareResults with appropriate data
@@ -603,6 +604,9 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
           )}
         </View>
       </ScrollView>
+
+      {/* Banner Ad */}
+      <BannerAdComponent containerStyle={styles.bannerAdContainer} />
     </View>
   );
 }
@@ -769,7 +773,14 @@ const createStyles = (theme) => StyleSheet.create({
   },
   submitContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingBottom: 80, // Increased padding for banner ad
+  },
+  bannerAdContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
   },
   submitButton: {
     backgroundColor: theme.primary,

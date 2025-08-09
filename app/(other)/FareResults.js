@@ -7,6 +7,7 @@ import { useTheme } from '@/constants/ThemeContext';
 import { useAuth } from '@/constants/AuthContext';
 import { useFavorites } from '@/constants/FavoritesContext';
 import adService from '../../services/adService';
+import BannerAdComponent from '../../components/BannerAdComponent';
 
 // Legal tariff constants
 const OFFICIAL_TARIFF_BASE_FARE = 9;
@@ -685,6 +686,9 @@ export default function FareResults() {
         {/* Bottom Padding */}
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Banner Ad */}
+      <BannerAdComponent containerStyle={styles.bannerAdContainer} />
     </View>
   );
 }
@@ -986,7 +990,14 @@ const createStyles = (theme) => StyleSheet.create({
     fontWeight: 'bold',
   },
   bottomPadding: {
-    height: 32,
+    height: 80, // Increased padding for banner ad
+  },
+  bannerAdContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'transparent',
   },
   infoContainer: {
     flexDirection: 'row',
