@@ -2,10 +2,19 @@
   publish = "dist"
   command = "npx expo export --platform web"
 
+# Handle bot crawlers differently - serve static content
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  conditions = {User-Agent = "!*bot*,!*crawler*,!*spider*,!*Googlebot*,!*AdsBot*"}
+
+# For bots, serve the main page directly
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  conditions = {User-Agent = "*bot*,*crawler*,*spider*,*Googlebot*,*AdsBot*"}
 
 [build.environment]
   NODE_VERSION = "18"

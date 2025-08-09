@@ -53,7 +53,8 @@ export default {
         "keywords": "taxi, fare, calculator, Egypt, Cairo, transportation, ride, estimate",
         "author": "Kam El Ogra",
         "viewport": "width=device-width, initial-scale=1.0",
-        "robots": "index, follow"
+        "robots": "index, follow",
+        "google-adsense-account": "ca-pub-8401949226434611"
       }
     },
     "plugins": [
