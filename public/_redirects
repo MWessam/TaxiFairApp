@@ -1,0 +1,6 @@
+# Netlify redirects for SPA
+/*    /index.html   200
+
+# Ensure crawlers can access the site
+/robots.txt   /robots.txt   200
+/sitemap.xml  /sitemap.xml  200
