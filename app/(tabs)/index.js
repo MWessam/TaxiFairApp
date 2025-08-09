@@ -1,12 +1,23 @@
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Dimensions, ScrollView, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Dimensions, ScrollView, Animated, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/constants/ThemeContext';
 import { useAuth } from '@/constants/AuthContext';
 import { getAvailableGovernorates } from '@/constants/Colors';
-import { configureMapbox } from '@/mapboxProvider';
+
+// Platform-specific mapbox configuration
+const configureMapbox = () => {
+  if (Platform.OS !== 'web') {
+    try {
+      const mapboxProvider = require('../../mapboxProvider');
+      mapboxProvider.configureMapbox();
+    } catch (error) {
+      console.warn('Failed to configure Mapbox:', error);
+    }
+  }
+};
 import LocationPermissionRequest from '../../components/LocationPermissionRequest';
 import SignInScreen from '../../components/SignInScreen';
 import locationService from '../../services/locationService';
@@ -148,19 +159,21 @@ export default function Home() {
       {/* Main content */}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.mainContent}>
-          {/* Main Track Ride Button */}
-          <Animated.View style={{ transform: [{ scale: buttonScale3 }] }}>
-            <TouchableOpacity 
-              style={styles.mainTrackButton} 
-              onPress={() => animateButton(buttonScale3, () => routerRef.current?.push('/(other)/TrackRide'))}
-              activeOpacity={0.95}
-              delayPressIn={0}
-              delayPressOut={0}
-            >
-              <Text style={styles.mainTrackButtonIcon}>📍</Text>
-              <Text style={styles.mainTrackButtonText}>تتبع الرحلة</Text>
-            </TouchableOpacity>
-          </Animated.View>
+          {/* Main Track Ride Button (hidden on web) */}
+          {Platform.OS !== 'web' && (
+            <Animated.View style={{ transform: [{ scale: buttonScale3 }] }}>
+              <TouchableOpacity 
+                style={styles.mainTrackButton} 
+                onPress={() => animateButton(buttonScale3, () => routerRef.current?.push('/(other)/TrackRide'))}
+                activeOpacity={0.95}
+                delayPressIn={0}
+                delayPressOut={0}
+              >
+                <Text style={styles.mainTrackButtonIcon}>📍</Text>
+                <Text style={styles.mainTrackButtonText}>تتبع الرحلة</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
 
           {/* Secondary Buttons Grid */}
           <View style={styles.secondaryButtonsGrid}>

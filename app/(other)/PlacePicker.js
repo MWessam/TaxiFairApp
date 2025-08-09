@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Modal, Dimensions, Alert, ScrollView } from 'react-native';
-import MapboxGL from '@rnmapbox/maps';
+import MapView, { MapboxGL } from '@/components/MapView';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
 import { searchPlacesMapbox, reverseGeocode } from '../../routeHelpers';
@@ -341,19 +341,17 @@ export default function PlacePicker() {
     return (
       <Modal visible={showMap} animationType="slide" presentationStyle="fullScreen">
         <View style={styles.mapContainer}>
-          <MapboxGL.MapView
+          <MapView
             ref={mapRef}
             style={styles.map}
-            onRegionDidChange={async () => {
-              try {
-                const [lng, lat] = await mapRef.current.getCenter();
-                console.log('Map center changed to:', { lat, lng }); // Debug log
-                setMapPin({ latitude: lat, longitude: lng });
-              } catch (error) {
-                console.log('Map region change error:', error);
-              }
+            center={currentLocation ? [currentLocation.longitude, currentLocation.latitude] : [31.2357, 30.0444]}
+            zoom={16}
+            onClick={([lng, lat]) => {
+              console.log('Map clicked at:', { lat, lng });
+              setMapPin({ latitude: lat, longitude: lng });
             }}
           >
+            {/* Native-specific children will be rendered only on native platforms */}
             {currentLocation && (
               <MapboxGL.Camera
                 ref={cameraRef}
@@ -370,7 +368,7 @@ export default function PlacePicker() {
                 showsUserHeadingIndicator={true}
               />
             )}
-          </MapboxGL.MapView>
+          </MapView>
 
           {/* Center Pin */}
           <View style={styles.centerPin}>

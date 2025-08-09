@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, ActivityIndicator, Platform, ScrollView, Dimensions } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import MapboxGL from '@rnmapbox/maps';
+import MapView, { MapboxGL } from '@/components/MapView';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getRouteDistanceORS, getGovernorateFromCoords } from '../../routeHelpers';
 import { saveTrip } from '../../firestoreHelpers';
@@ -425,7 +425,12 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
         {/* Map Area */}
         <View style={styles.mapCard}>
           <View style={styles.mapContainer}>
-            <MapboxGL.MapView style={styles.map}>
+            <MapView 
+              style={styles.map}
+              center={getMapCenter()}
+              zoom={14}
+            >
+              {/* Native-specific map elements */}
               <MapboxGL.Camera ref={cameraRef} />
               {from.lat && from.lng && (
                 <MapboxGL.PointAnnotation id="fromPoint" coordinate={[from.lng, from.lat]}>
@@ -462,7 +467,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
                   }}
                 />
               )}
-            </MapboxGL.MapView>
+            </MapView>
             <View style={styles.mapOverlay}>
               <Ionicons name="location" size={32} color={theme.primary} />
             </View>

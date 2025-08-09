@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   signInUserAnonymously, 
@@ -24,6 +25,55 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMethod, setAuthMethod] = useState(null); // 'anonymous', 'google_automatic', 'google_manual', or null
+
+  // Cross-platform storage wrapper: uses AsyncStorage on native, localStorage on web
+  const webLocalStorage = typeof window !== 'undefined' && window.localStorage ? window.localStorage : null;
+  const storage = {
+    getItem: async (key) => {
+      if (Platform.OS === 'web' && webLocalStorage) {
+        try {
+          return webLocalStorage.getItem(key);
+        } catch {
+          return null;
+        }
+      }
+      try {
+        return await AsyncStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    },
+    setItem: async (key, value) => {
+      if (Platform.OS === 'web' && webLocalStorage) {
+        try {
+          webLocalStorage.setItem(key, value);
+          return;
+        } catch {
+          return;
+        }
+      }
+      try {
+        await AsyncStorage.setItem(key, value);
+      } catch {
+        // ignore
+      }
+    },
+    removeItem: async (key) => {
+      if (Platform.OS === 'web' && webLocalStorage) {
+        try {
+          webLocalStorage.removeItem(key);
+          return;
+        } catch {
+          return;
+        }
+      }
+      try {
+        await AsyncStorage.removeItem(key);
+      } catch {
+        // ignore
+      }
+    },
+  };
 
   // Initialize authentication state
   useEffect(() => {
@@ -52,8 +102,8 @@ export const AuthProvider = ({ children }) => {
         }
         
         // Save user data to AsyncStorage
-        await AsyncStorage.setItem('user', JSON.stringify(userData));
-        await AsyncStorage.setItem('authMethod', authMethod || 'google_automatic');
+        await storage.setItem('user', JSON.stringify(userData));
+        await storage.setItem('authMethod', authMethod || 'google_automatic');
       } else {
         // User is signed out
         setUser(null);
@@ -61,8 +111,8 @@ export const AuthProvider = ({ children }) => {
         setAuthMethod(null);
         
         // Clear stored user data
-        await AsyncStorage.removeItem('user');
-        await AsyncStorage.removeItem('authMethod');
+        await storage.removeItem('user');
+        await storage.removeItem('authMethod');
       }
       
       setLoading(false);
@@ -96,8 +146,8 @@ export const AuthProvider = ({ children }) => {
 
   const loadCachedUser = async () => {
     try {
-      const cachedUser = await AsyncStorage.getItem('user');
-      const cachedAuthMethod = await AsyncStorage.getItem('authMethod');
+      const cachedUser = await storage.getItem('user');
+      const cachedAuthMethod = await storage.getItem('authMethod');
       
       if (cachedUser) {
         const userData = JSON.parse(cachedUser);
@@ -138,18 +188,7 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: 'Failed to sign in with Google' };
     } catch (error) {
       console.error('Error signing in with Google:', error);
-      
-      // Provide more specific error messages
-      let errorMessage = error.message;
-      if (error.message.includes('non recoverable')) {
-        errorMessage = 'Google Sign-In is not available. Please check your Google account settings or try again later.';
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Network error. Please check your internet connection and try again.';
-      } else if (error.message.includes('cancelled')) {
-        errorMessage = 'Sign-in was cancelled.';
-      }
-      
-      return { success: false, error: errorMessage };
+      return { success: false, error: error.message };
     } finally {
       setLoading(false);
     }
@@ -164,8 +203,8 @@ export const AuthProvider = ({ children }) => {
       setAuthMethod(null);
       
       // Clear stored data
-      await AsyncStorage.removeItem('user');
-      await AsyncStorage.removeItem('authMethod');
+      await storage.removeItem('user');
+      await storage.removeItem('authMethod');
       
       return { success: true };
     } catch (error) {

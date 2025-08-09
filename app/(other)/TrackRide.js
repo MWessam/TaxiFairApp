@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, use } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Dimensions } from 'react-native';
-import MapboxGL from '@rnmapbox/maps';
+import MapView, { MapboxGL } from '@/components/MapView';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import { distillRoute, calculateRouteDistance, getGovernorateFromCoords, getAddressFromCoords } from '../../routeHelpers';

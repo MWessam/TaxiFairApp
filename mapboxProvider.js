@@ -1,5 +1,5 @@
 // src/providers/MapboxProvider.js or similar
-import MapboxGL from '@rnmapbox/maps';
+import { MapboxGL } from './components/MapView';
 import Constants from 'expo-constants';
 
 export function configureMapbox() {
