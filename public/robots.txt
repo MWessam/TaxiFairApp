@@ -7,4 +7,4 @@ Allow: /
 User-agent: AdsBot-Google
 Allow: /
 
-Sitemap: https://your-netlify-site.netlify.app/sitemap.xml
+Sitemap: https://shimmering-starlight-00e08f.netlify.app/sitemap.xml
