@@ -1,5 +1,5 @@
-// AdMob Configuration
-// Replace these with your actual AdMob ad unit IDs
+// AdMob Configuration for mobile and AdSense for web
+// Replace these with your actual AdMob ad unit IDs and AdSense configuration
 
 export const AD_CONFIG = {
   // Test IDs (for development)
@@ -23,6 +23,59 @@ export const AD_CONFIG = {
       banner: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY',
       interstitial: 'ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ',
       rewarded: 'ca-app-pub-XXXXXXXXXXXXXXXX/WWWWWWWWWW',
+    },
+    
+    // Web (AdSense)
+    web: {
+      // Replace with your actual AdSense publisher ID and ad unit IDs
+      publisherId: 'ca-pub-XXXXXXXXXXXXXXXX',
+      banner: {
+        // Standard banner ad unit
+        slot: 'YYYYYYYYYY',
+        format: 'auto',
+        responsive: true,
+      },
+      // Add more ad formats as needed
+      rectangle: {
+        slot: 'ZZZZZZZZZZ',
+        format: 'rectangle',
+        responsive: true,
+      },
+    },
+  },
+  
+  // AdSense specific configuration for web
+  adsense: {
+    // Test mode for development
+    test: {
+      enabled: true,
+      publisherId: 'ca-pub-test',
+      testSlot: '1234567890',
+    },
+    
+    // AdSense settings
+    settings: {
+      // Auto ads configuration
+      autoAds: {
+        enabled: true,
+        // Types of auto ads to show
+        pageLevel: true,
+        anchor: true,
+        multiplex: true,
+      },
+      
+      // Manual ad settings
+      manualAds: {
+        enabled: true,
+        lazyLoading: true,
+        refreshInterval: 30000, // 30 seconds
+      },
+      
+      // Privacy and compliance
+      privacy: {
+        nonPersonalizedAds: true,
+        cookieConsent: true,
+      },
     },
   },
   
@@ -55,8 +108,21 @@ export const AD_CONFIG = {
 
 // Helper function to get ad unit ID based on platform and type
 export const getAdUnitId = (type, platform = null) => {
-  const currentPlatform = platform || Platform.OS;
-  const isDevelopment = __DEV__;
+  // For web environment, we need to handle this differently
+  if (typeof window !== 'undefined') {
+    // We're in a web environment
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    if (isDevelopment) {
+      return AD_CONFIG.adsense.test.testSlot;
+    }
+    
+    return AD_CONFIG.production.web[type]?.slot || AD_CONFIG.production.web.banner.slot;
+  }
+  
+  // For mobile platforms
+  const currentPlatform = platform || (typeof Platform !== 'undefined' ? Platform.OS : 'web');
+  const isDevelopment = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV === 'development';
   
   if (isDevelopment) {
     return AD_CONFIG.test[type];
@@ -67,6 +133,33 @@ export const getAdUnitId = (type, platform = null) => {
 
 // Helper function to get app ID
 export const getAppId = (platform = null) => {
-  const currentPlatform = platform || Platform.OS;
+  if (typeof window !== 'undefined') {
+    // Web environment - return AdSense publisher ID
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    if (isDevelopment) {
+      return AD_CONFIG.adsense.test.publisherId;
+    }
+    
+    return AD_CONFIG.production.web.publisherId;
+  }
+  
+  // Mobile platforms
+  const currentPlatform = platform || (typeof Platform !== 'undefined' ? Platform.OS : 'web');
   return AD_CONFIG.appId[currentPlatform];
+};
+
+// Helper function to get AdSense configuration
+export const getAdSenseConfig = () => {
+  const isDevelopment = typeof window !== 'undefined' ? 
+    process.env.NODE_ENV === 'development' : 
+    (typeof __DEV__ !== 'undefined' ? __DEV__ : false);
+    
+  return {
+    ...AD_CONFIG.adsense.settings,
+    publisherId: isDevelopment ? 
+      AD_CONFIG.adsense.test.publisherId : 
+      AD_CONFIG.production.web.publisherId,
+    isDevelopment
+  };
 }; 
