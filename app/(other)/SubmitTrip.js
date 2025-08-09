@@ -33,6 +33,29 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
   const [currentLocation, setCurrentLocation] = useState(null);
   const cameraRef = useRef();
 
+  // Ensure current location is available and permissions requested
+  useEffect(() => {
+    const initLocation = async () => {
+      try {
+        if (!locationService.isInitialized) {
+          await locationService.initialize();
+        }
+        const existing = locationService.getCurrentLocation();
+        if (existing && existing.latitude && existing.longitude) {
+          setCurrentLocation({ lat: existing.latitude, lng: existing.longitude });
+        } else {
+          const loc = await locationService.requestLocationPermission();
+          if (loc && loc.latitude && loc.longitude) {
+            setCurrentLocation({ lat: loc.latitude, lng: loc.longitude });
+          }
+        }
+      } catch (e) {
+        // ignore; fallback center will be used
+      }
+    };
+    initLocation();
+  }, []);
+
   // Clean and merge parameters properly
   const cleanRouteParams = useMemo(() => {
     const cleaned = {};
@@ -429,6 +452,16 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
               style={styles.map}
               center={getMapCenter()}
               zoom={14}
+              onRegionDidChange={(e) => {
+                // keep currentLocation in sync if user pans and neither from/to set
+                if (!(from.lat && from.lng) && !(to.lat && to.lng)) {
+                  const coords = e?.geometry?.coordinates;
+                  if (Array.isArray(coords)) {
+                    const [lng, lat] = coords;
+                    setCurrentLocation({ lat, lng });
+                  }
+                }
+              }}
             >
               {/* Native-specific map elements */}
               <MapboxGL.Camera ref={cameraRef} />

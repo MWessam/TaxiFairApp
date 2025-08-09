@@ -346,6 +346,18 @@ export default function PlacePicker() {
             style={styles.map}
             center={currentLocation ? [currentLocation.longitude, currentLocation.latitude] : [31.2357, 30.0444]}
             zoom={16}
+            onRegionDidChange={(e) => {
+              try {
+                // Support both native (@rnmapbox/maps) and web wrapper event shapes
+                if (e && e.geometry && Array.isArray(e.geometry.coordinates)) {
+                  const [lng, lat] = e.geometry.coordinates;
+                  setMapPin({ latitude: lat, longitude: lng });
+                } else if (e && e.nativeEvent && e.nativeEvent.geometry && Array.isArray(e.nativeEvent.geometry.coordinates)) {
+                  const [lng, lat] = e.nativeEvent.geometry.coordinates;
+                  setMapPin({ latitude: lat, longitude: lng });
+                }
+              } catch {}
+            }}
             onClick={([lng, lat]) => {
               console.log('Map clicked at:', { lat, lng });
               setMapPin({ latitude: lat, longitude: lng });
