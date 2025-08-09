@@ -317,11 +317,13 @@ const createStyles = (theme, { contentMaxWidth }) => StyleSheet.create({
     paddingBottom: 60, // Add padding for banner ad
   },
   bannerAdContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    position: 'relative',
+    width: '100%',
     backgroundColor: 'transparent',
+    // Add a subtle border to separate from content
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 5,
   },
   mainContent: {
     flex: 1,

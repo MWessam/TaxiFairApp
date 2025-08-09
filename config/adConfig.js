@@ -28,10 +28,10 @@ export const AD_CONFIG = {
     // Web (AdSense)
     web: {
       // Replace with your actual AdSense publisher ID and ad unit IDs
-      publisherId: 'ca-pub-XXXXXXXXXXXXXXXX',
+      publisherId: 'ca-pub-8401949226434611', // ← Your actual Publisher ID
       banner: {
         // Standard banner ad unit
-        slot: 'YYYYYYYYYY',
+        slot: 'YYYYYYYYYY', // ← Replace with YOUR Ad Unit ID
         format: 'auto',
         responsive: true,
       },
