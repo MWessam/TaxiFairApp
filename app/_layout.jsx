@@ -92,18 +92,12 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <Head>
-        <meta name="google-adsense-account" content="ca-pub-8401949226434611" />
-        <meta name="description" content="حاسبة أجرة التاكسي في مصر - احسب تكلفة رحلتك بدقة عالية مع تتبع مباشر للمسافة والوقت" />
-        <meta name="keywords" content="تاكسي, أجرة, حاسبة, مصر, القاهرة, النقل, رحلة, تكلفة" />
-        <meta name="author" content="Kam El Ogra" />
-        <meta name="robots" content="index, follow" />
-        <title>كم الأجرة - حاسبة أجرة التاكسي</title>
-      </Head>
-      <AuthProvider>
-        <ThemeProvider>
-          <FavoritesProvider>
+    <>
+
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AuthProvider>
+          <ThemeProvider>
+            <FavoritesProvider>
             <NavigationThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack
               screenOptions={{
@@ -130,8 +124,9 @@ export default function RootLayout() {
             </NavigationThemeProvider>
           </FavoritesProvider>
         </ThemeProvider>
-      </AuthProvider>
-    </GestureHandlerRootView>
+        </AuthProvider>
+      </GestureHandlerRootView>
+    </>
   );
 }
 
