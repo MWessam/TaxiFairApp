@@ -347,16 +347,23 @@ export default function PlacePicker() {
             center={currentLocation ? [currentLocation.longitude, currentLocation.latitude] : [31.2357, 30.0444]}
             zoom={16}
             onRegionDidChange={(e) => {
+              console.log('🎯 PlacePicker received onRegionDidChange:', e);
               try {
                 // Support both native (@rnmapbox/maps) and web wrapper event shapes
                 if (e && e.geometry && Array.isArray(e.geometry.coordinates)) {
                   const [lng, lat] = e.geometry.coordinates;
+                  console.log('📍 Setting mapPin from geometry:', { lat, lng });
                   setMapPin({ latitude: lat, longitude: lng });
                 } else if (e && e.nativeEvent && e.nativeEvent.geometry && Array.isArray(e.nativeEvent.geometry.coordinates)) {
                   const [lng, lat] = e.nativeEvent.geometry.coordinates;
+                  console.log('📍 Setting mapPin from nativeEvent:', { lat, lng });
                   setMapPin({ latitude: lat, longitude: lng });
+                } else {
+                  console.warn('⚠️ PlacePicker: Could not extract coordinates from event:', e);
                 }
-              } catch {}
+              } catch (error) {
+                console.log('❌ PlacePicker onRegionDidChange error:', error);
+              }
             }}
             onClick={([lng, lat]) => {
               console.log('Map clicked at:', { lat, lng });

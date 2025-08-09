@@ -33,11 +33,14 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
   const [loading, setLoading] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [mapCenter, setMapCenter] = useState([31.2357, 30.0444]); // Stable map center
   const cameraRef = useRef();
 
   // Ensure current location is available and permissions requested
   useEffect(() => {
     const initLocation = async () => {
+      setLocationLoading(true);
       try {
         if (!locationService.isInitialized) {
           await locationService.initialize();
@@ -45,26 +48,42 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
         const existing = locationService.getCurrentLocation();
         if (existing && existing.latitude && existing.longitude) {
           setCurrentLocation({ lat: existing.latitude, lng: existing.longitude });
+          setMapCenter([existing.longitude, existing.latitude]);
+          setLocationLoading(false);
+          return;
+        }
+        
+        const loc = await locationService.requestLocationPermission();
+        if (loc && loc.latitude && loc.longitude) {
+          setCurrentLocation({ lat: loc.latitude, lng: loc.longitude });
+          setMapCenter([loc.longitude, loc.latitude]);
+          setLocationLoading(false);
+          return;
+        }
+        
+        if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
+          // Web fallback to browser Geolocation API
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const { latitude, longitude } = pos.coords || {};
+              if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+                setCurrentLocation({ lat: latitude, lng: longitude });
+                setMapCenter([longitude, latitude]);
+              }
+              setLocationLoading(false);
+            },
+            (error) => {
+              console.warn('Geolocation error:', error);
+              setLocationLoading(false);
+            },
+            { enableHighAccuracy: true, maximumAge: 15000, timeout: 8000 }
+          );
         } else {
-          const loc = await locationService.requestLocationPermission();
-          if (loc && loc.latitude && loc.longitude) {
-            setCurrentLocation({ lat: loc.latitude, lng: loc.longitude });
-          } else if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
-            // Web fallback to browser Geolocation API
-            navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                const { latitude, longitude } = pos.coords || {};
-                if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
-                  setCurrentLocation({ lat: latitude, lng: longitude });
-                }
-              },
-              () => {},
-              { enableHighAccuracy: true, maximumAge: 15000, timeout: 8000 }
-            );
-          }
+          setLocationLoading(false);
         }
       } catch (e) {
-        // ignore; fallback center will be used
+        console.warn('Location initialization error:', e);
+        setLocationLoading(false);
       }
     };
     initLocation();
@@ -122,6 +141,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
       };
       console.log('Setting from:', fromData); // Debug log
       setFrom(fromData);
+      setMapCenter([fromData.lng, fromData.lat]); // Update map center
     }
     if (params.to_name && params.to_lat && params.to_lng) {
       const toData = { 
@@ -131,6 +151,10 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
       };
       console.log('Setting to:', toData); // Debug log
       setTo(toData);
+      // If we don't have a 'from' location, center on 'to'
+      if (!from.lat || !from.lng) {
+        setMapCenter([toData.lng, toData.lat]);
+      }
     }
   }, [params.from_name, params.from_lat, params.from_lng, params.to_name, params.to_lat, params.to_lng]); // Watch specific param properties
 
@@ -167,6 +191,8 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
     const unsubscribe = locationService.subscribe(({ location, status }) => {
       if (location) {
         setCurrentLocation({ lat: location.latitude, lng: location.longitude });
+        setMapCenter([location.longitude, location.latitude]);
+        setLocationLoading(false); // Stop loading when location is found
       }
     });
     
@@ -391,11 +417,10 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
     setShowTimePicker(true);
   };
 
-  // Get map camera options
+  // Get map camera options using stable center
   const getMapCenter = () => {
     if (from.lat && from.lng) return [from.lng, from.lat];
-    if (currentLocation) return [currentLocation.lng, currentLocation.lat];
-    return [31.2357, 30.0444];
+    return mapCenter; // Use the stable map center
   };
 
   const getBoundsIfNeeded = () => {
@@ -537,7 +562,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
               </Text>
             </View>
           )}
-          <View style={styles.headerSpacer} />
+          {/* <View style={styles.headerSpacer} /> */}
         </View>
       </View>
 
@@ -548,7 +573,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
             <MapView 
               style={styles.map}
               center={getMapCenter()}
-              zoom={14}
+              zoom={currentLocation ? 14 : 10}
               bounds={getBoundsIfNeeded()}
               onRegionDidChange={(e) => {
                 // keep currentLocation in sync if user pans and neither from/to set
@@ -602,6 +627,17 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
                 />
               )}
             </MapView>
+            
+            {/* Loading overlay when determining location */}
+            {locationLoading && (
+              <View style={styles.mapLoadingOverlay}>
+                <View style={styles.mapLoadingContent}>
+                  <ActivityIndicator size="large" color={theme.primary} />
+                  <Text style={styles.mapLoadingText}>جاري تحديد موقعك...</Text>
+                </View>
+              </View>
+            )}
+            
             <View style={styles.mapOverlay}>
               <Ionicons name="location" size={32} color={theme.primary} />
             </View>
@@ -873,13 +909,44 @@ const createStyles = (theme, { mapHeight, contentMaxWidth }) => StyleSheet.creat
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    width: '80%'
   },
   mapContainer: {
     height: mapHeight,
     position: 'relative',
   },
   map: {
+    width: '100%',
     flex: 1,
+  },
+  mapLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  mapLoadingContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapLoadingText: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    marginTop: 12,
+    textAlign: 'center',
   },
   mapOverlay: {
     position: 'absolute',
@@ -1001,6 +1068,7 @@ const createStyles = (theme, { mapHeight, contentMaxWidth }) => StyleSheet.creat
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
+    width: 96,
   },
   submitButtonText: {
     color: '#FFFFFF',

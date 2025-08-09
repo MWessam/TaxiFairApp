@@ -61,15 +61,44 @@ export default function MapViewNative({
           } catch {}
         }}
         onRegionDidChange={(region) => {
-          if (!onRegionDidChange) return;
+          console.log('🗺️ Native MapView onRegionDidChange triggered:', region);
+          if (!onRegionDidChange) {
+            console.log('❌ No onRegionDidChange callback provided');
+            return;
+          }
           try {
             // region has properties with centerCoordinate
             if (region && region.properties && (Array.isArray(region.properties.center) || Array.isArray(region.properties.centerCoordinate))) {
               const centerArr = region.properties.center || region.properties.centerCoordinate;
               const [lng, lat] = centerArr;
+              console.log('✅ Calling onRegionDidChange with coordinates:', { lng, lat });
               onRegionDidChange({ geometry: { coordinates: [lng, lat] } });
+            } else {
+              console.warn('⚠️ Could not extract coordinates from region:', region);
+              // Try alternative structures
+              if (region && region.geometry && region.geometry.coordinates) {
+                const [lng, lat] = region.geometry.coordinates;
+                console.log('✅ Using geometry coordinates:', { lng, lat });
+                onRegionDidChange({ geometry: { coordinates: [lng, lat] } });
+              } else if (region && Array.isArray(region) && region.length >= 2) {
+                const [lng, lat] = region;
+                console.log('✅ Using direct array coordinates:', { lng, lat });
+                onRegionDidChange({ geometry: { coordinates: [lng, lat] } });
+              } else {
+                console.error('❌ Unable to parse region data:', region);
+              }
             }
-          } catch {}
+          } catch (error) {
+            console.error('❌ Error in onRegionDidChange:', error);
+          }
+        }}
+        onRegionIsChanging={(region) => {
+          console.log('🔄 Native MapView onRegionIsChanging triggered:', region);
+          // This fires while dragging - we might want to use this instead for real-time updates
+        }}
+        onCameraChanged={(state) => {
+          console.log('📹 Native MapView onCameraChanged triggered:', state);
+          // Alternative event that might work better on Android
         }}
         {...props}
       >

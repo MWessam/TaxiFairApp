@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/constants/ThemeContext';
 import { useAuth } from '@/constants/AuthContext';
 import { useFavorites } from '@/constants/FavoritesContext';
+import { useResponsiveValue } from '@/constants/responsive';
 import adService from '../../services/adService';
 import BannerAdComponent from '../../components/BannerAdComponent';
 
@@ -19,6 +20,7 @@ export default function FareResults() {
   const { theme } = useTheme();
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const { addFavorite } = useFavorites();
+  const contentMaxWidth = useResponsiveValue({ small: '100%', medium: 720, large: 960, default: '100%' });
 
   const [paidFare, setPaidFare] = useState(params.paidFare || '');
   const [showResults, setShowResults] = useState(!!params.paidFare);
@@ -378,7 +380,7 @@ export default function FareResults() {
   };
 
   const analysis = getAnalysisData();
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, { contentMaxWidth });
 
   const CustomBarChart = ({ data, dataKey, title }) => {
     if (!data || data.length === 0) return null;
@@ -693,7 +695,7 @@ export default function FareResults() {
   );
 }
 
-const createStyles = (theme) => StyleSheet.create({
+const createStyles = (theme, { contentMaxWidth }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
@@ -712,7 +714,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    maxWidth: 400,
+    maxWidth: contentMaxWidth,
     alignSelf: 'center',
     width: '100%',
   },
@@ -743,6 +745,9 @@ const createStyles = (theme) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    width: '100%',
+    maxWidth: contentMaxWidth,
+    alignSelf: 'center',
   },
   cardContent: {
     padding: 24,
