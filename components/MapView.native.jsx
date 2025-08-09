@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import MapboxGL from '@rnmapbox/maps';
 
@@ -12,10 +12,39 @@ export default function MapViewNative({
   zoom, 
   onClick,
   onRegionDidChange,
+  bounds, // { ne: [lng, lat], sw: [lng, lat], padding?: number, animationDuration?: number }
   ...props 
 }) {
   const initialCenter = center && Array.isArray(center) ? center : undefined;
   const initialZoom = typeof zoom === 'number' ? zoom : undefined;
+  const cameraRef = useRef(null);
+
+  useEffect(() => {
+    if (cameraRef.current && Array.isArray(center)) {
+      try {
+        cameraRef.current.setCamera({
+          centerCoordinate: center,
+          zoomLevel: initialZoom || 14,
+          animationDuration: 800,
+        });
+      } catch {}
+    }
+  }, [center?.[0], center?.[1]]);
+
+  useEffect(() => {
+    if (cameraRef.current && bounds && Array.isArray(bounds.ne) && Array.isArray(bounds.sw)) {
+      try {
+        cameraRef.current.setCamera({
+          bounds: {
+            ne: bounds.ne,
+            sw: bounds.sw,
+            padding: bounds.padding ?? 40,
+          },
+          animationDuration: bounds.animationDuration ?? 800,
+        });
+      } catch {}
+    }
+  }, [bounds?.ne?.[0], bounds?.ne?.[1], bounds?.sw?.[0], bounds?.sw?.[1]]);
 
   return (
     <View style={[{ flex: 1 }, style]}>
@@ -44,15 +73,13 @@ export default function MapViewNative({
         }}
         {...props}
       >
-        {/* Set initial camera only; do not bind to props to allow gestures */}
-        {(initialCenter || initialZoom !== undefined) && (
-          <MapboxGL.Camera
-            defaultSettings={{
-              centerCoordinate: initialCenter,
-              zoomLevel: initialZoom,
-            }}
-          />
-        )}
+        <MapboxGL.Camera
+          ref={cameraRef}
+          defaultSettings={{
+            centerCoordinate: initialCenter,
+            zoomLevel: initialZoom,
+          }}
+        />
         {children}
       </MapboxGL.MapView>
     </View>

@@ -87,12 +87,36 @@ function extractMLFeatures(tripData) {
   
   // Extract time features
   if (tripData.start_time) {
-    const startDate = new Date(tripData.start_time);
-    features.time_of_day = startDate.getHours(); // 0-23
-    features.day_of_week = startDate.getDay(); // 0=Sunday, 6=Saturday
-    features.date = startDate.toISOString().split('T')[0]; // YYYY-MM-DD
-    features.month = startDate.getMonth() + 1; // 1-12 (getMonth() returns 0-11)
-    features.day_of_month = startDate.getDate(); // 1-31
+    // Use Cairo timezone when available for consistent local features
+    try {
+      const fmt = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Africa/Cairo',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
+      const parts = fmt.formatToParts(new Date(tripData.start_time));
+      const get = (type) => Number(parts.find(p => p.type === type)?.value);
+      const year = get('year');
+      const month = get('month');
+      const day = get('day');
+      const hour = get('hour');
+      // Build a Cairo-local date string for features
+      features.time_of_day = hour; // 0-23
+      // Day of week in Cairo timezone
+      const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'Africa/Cairo' }).format(new Date(tripData.start_time));
+      const weekdayMap = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+      features.day_of_week = weekdayMap[weekday] ?? 0;
+      features.date = `${year.toString().padStart(4,'0')}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      features.month = month;
+      features.day_of_month = day;
+    } catch {
+      const startDate = new Date(tripData.start_time);
+      features.time_of_day = startDate.getHours();
+      features.day_of_week = startDate.getDay();
+      features.date = startDate.toISOString().split('T')[0];
+      features.month = startDate.getMonth() + 1;
+      features.day_of_month = startDate.getDate();
+    }
   }
   
   // Extract speed feature
@@ -503,7 +527,7 @@ exports.submitTrip = onCall({
       throw new Error(`Validation failed: ${errors.join(', ')}`);
     }
     
-    // Extract ML features from the trip data
+    // Extract ML features from the trip data (Cairo timezone-aware)
     const mlFeatures = extractMLFeatures(data);
     
     // Add ML features to trip data for validation

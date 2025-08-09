@@ -11,6 +11,7 @@ import locationService from '../../services/locationService';
 import adService from '../../services/adService';
 import BannerAdComponent from '../../components/BannerAdComponent';
 import { Ionicons } from '@expo/vector-icons';
+import { useResponsiveValue, useBreakpoints } from '@/constants/responsive';
 
 const { width, height } = Dimensions.get('window');
 
@@ -19,6 +20,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
   const routeParams = useLocalSearchParams();
   
   const { theme } = useTheme();
+  const { isSmall, isMedium, isLarge } = useBreakpoints();
   const { isAuthenticated, loading: authLoading, user } = useAuth();
 
   const [from, setFrom] = useState({ address: '', lat: null, lng: null });
@@ -26,7 +28,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
   const [fare, setFare] = useState('');
   const [duration, setDuration] = useState('');
   const [passengers, setPassengers] = useState('1');
-  const [startTime, setStartTime] = useState(null);
+  const [startTime, setStartTime] = useState(() => new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [loading, setLoading] = useState(false);
   const [routeCoords, setRouteCoords] = useState([]);
@@ -47,6 +49,18 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
           const loc = await locationService.requestLocationPermission();
           if (loc && loc.latitude && loc.longitude) {
             setCurrentLocation({ lat: loc.latitude, lng: loc.longitude });
+          } else if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.geolocation) {
+            // Web fallback to browser Geolocation API
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                const { latitude, longitude } = pos.coords || {};
+                if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+                  setCurrentLocation({ lat: latitude, lng: longitude });
+                }
+              },
+              () => {},
+              { enableHighAccuracy: true, maximumAge: 15000, timeout: 8000 }
+            );
           }
         }
       } catch (e) {
@@ -160,15 +174,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
     return unsubscribe;
   }, []);
 
-  useEffect(() => {
-    if (cameraRef.current && getMapCenter()) {
-      cameraRef.current.setCamera({
-        centerCoordinate: getMapCenter(),
-        zoomLevel: 14,
-        animationDuration: 1000,
-      });
-    }
-  }, [currentLocation, from, to]);
+  // No direct cameraRef control on web; MapView will react to center/bounds props
 
   const handleSubmit = async () => {
     // Validation based on mode
@@ -312,19 +318,108 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
     }
   };
 
-  // Get map center coordinates
-  const getMapCenter = () => {
-    if (from.lat && from.lng && to.lat && to.lng) {
-      const midLat = (from.lat + to.lat) / 2;
-      const midLng = (from.lng + to.lng) / 2;
-      return [midLng, midLat];
-    } else if (from.lat && from.lng) {
-      return [from.lng, from.lat];
-    } else if (currentLocation) {
-      return [currentLocation.lng, currentLocation.lat];
-    } else {
-      return [31.2357, 30.0444];
+  // Web-friendly time picker fallback with robust fallbacks
+  const handleOpenTimePicker = () => {
+    if (Platform.OS === 'web') {
+      try {
+        if (typeof document === 'undefined') {
+          setShowTimePicker(true);
+          return;
+        }
+        const input = document.createElement('input');
+        input.type = 'time';
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        input.style.pointerEvents = 'none';
+        input.style.zIndex = '-1';
+        const current = startTime || new Date();
+        const hh = String(current.getHours()).padStart(2, '0');
+        const mm = String(current.getMinutes()).padStart(2, '0');
+        input.value = `${hh}:${mm}`;
+        const cleanup = () => {
+          try { input && input.parentNode && input.parentNode.removeChild(input); } catch {}
+        };
+        input.addEventListener('change', (e) => {
+          try {
+            const value = e.target.value; // HH:mm
+            if (value && /^\d{2}:\d{2}$/.test(value)) {
+              const [h, m] = value.split(':').map(Number);
+              const d = new Date();
+              d.setHours(h);
+              d.setMinutes(m);
+              d.setSeconds(0);
+              d.setMilliseconds(0);
+              setStartTime(d);
+            }
+          } finally {
+            cleanup();
+          }
+        });
+        input.addEventListener('blur', cleanup);
+        document.body.appendChild(input);
+        if (typeof input.showPicker === 'function') {
+          input.showPicker();
+        } else {
+          input.focus();
+          input.click();
+          // As a last resort (Safari iOS/macOS where time input may not be supported)
+          setTimeout(() => {
+            try {
+              const active = document.activeElement;
+              const unsupported = !active || active !== input;
+              if (unsupported) {
+                cleanup();
+                const entered = window.prompt('أدخل الوقت (HH:MM)', `${hh}:${mm}`);
+                if (entered && /^\d{2}:\d{2}$/.test(entered)) {
+                  const [h, m] = entered.split(':').map(Number);
+                  const d = new Date();
+                  d.setHours(h);
+                  d.setMinutes(m);
+                  d.setSeconds(0);
+                  d.setMilliseconds(0);
+                  setStartTime(d);
+                }
+              }
+            } catch { cleanup(); }
+          }, 80);
+        }
+        return;
+      } catch {
+        // Fall back to native picker if anything unexpected happens
+      }
     }
+    setShowTimePicker(true);
+  };
+
+  // Get map camera options
+  const getMapCenter = () => {
+    if (from.lat && from.lng) return [from.lng, from.lat];
+    if (currentLocation) return [currentLocation.lng, currentLocation.lat];
+    return [31.2357, 30.0444];
+  };
+
+  const getBoundsIfNeeded = () => {
+    if (routeCoords && routeCoords.length > 0) {
+      // Fit to route coordinates for best view
+      let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+      for (const pt of routeCoords) {
+        if (!Array.isArray(pt) || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1])) continue;
+        const [lng, lat] = pt;
+        if (lng < minLng) minLng = lng;
+        if (lat < minLat) minLat = lat;
+        if (lng > maxLng) maxLng = lng;
+        if (lat > maxLat) maxLat = lat;
+      }
+      if (Number.isFinite(minLng) && Number.isFinite(minLat) && Number.isFinite(maxLng) && Number.isFinite(maxLat)) {
+        return { ne: [maxLng, maxLat], sw: [minLng, minLat], padding: 50, animationDuration: 800 };
+      }
+    }
+    if (from.lat && from.lng && to.lat && to.lng) {
+      const ne = [Math.max(from.lng, to.lng), Math.max(from.lat, to.lat)];
+      const sw = [Math.min(from.lng, to.lng), Math.min(from.lat, to.lat)];
+      return { ne, sw, padding: 50, animationDuration: 800 };
+    }
+    return null;
   };
 
   const handleNavigateToPlacePicker = (type) => {
@@ -415,7 +510,9 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
     );
   }
 
-  const styles = createStyles(theme);
+  const mapHeight = useResponsiveValue({ small: 280, medium: 360, large: 500, default: 280 });
+  const contentMaxWidth = useResponsiveValue({ small: '100%', medium: 720, large: 960, default: '100%' });
+  const styles = createStyles(theme, { mapHeight, contentMaxWidth });
   const isFormComplete = from.address && to.address && (isEstimateMode || fare);
 
   return (
@@ -444,7 +541,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Map Area */}
         <View style={styles.mapCard}>
           <View style={styles.mapContainer}>
@@ -452,6 +549,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
               style={styles.map}
               center={getMapCenter()}
               zoom={14}
+              bounds={getBoundsIfNeeded()}
               onRegionDidChange={(e) => {
                 // keep currentLocation in sync if user pans and neither from/to set
                 if (!(from.lat && from.lng) && !(to.lat && to.lng)) {
@@ -462,9 +560,12 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
                   }
                 }
               }}
+              webMarkers={[
+                ...(from.lat && from.lng ? [{ lng: from.lng, lat: from.lat, color: '#10B981' }] : []),
+                ...(to.lat && to.lng ? [{ lng: to.lng, lat: to.lat, color: '#EF4444' }] : []),
+              ]}
+              webLineCoords={routeCoords}
             >
-              {/* Native-specific map elements */}
-              <MapboxGL.Camera ref={cameraRef} />
               {from.lat && from.lng && (
                 <MapboxGL.PointAnnotation id="fromPoint" coordinate={[from.lng, from.lat]}>
                   <View style={[styles.mapPin, { backgroundColor: '#10B981' }]} />
@@ -504,9 +605,11 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
             <View style={styles.mapOverlay}>
               <Ionicons name="location" size={32} color={theme.primary} />
             </View>
-            <View style={styles.locationBadge}>
-              <Text style={styles.locationBadgeText}>القاهرة، مصر</Text>
-            </View>
+            {false && (
+              <View style={styles.locationBadge}>
+                <Text style={styles.locationBadgeText}>القاهرة، مصر</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -566,16 +669,81 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>وقت بداية الرحلة</Text>
-                <TouchableOpacity
-                  style={styles.inputContainer}
-                  onPress={() => setShowTimePicker(true)}
-                >
-                  <Ionicons name="time" size={16} color={theme.textSecondary} style={styles.inputIcon} />
-                  <Text style={[styles.input, { color: startTime ? theme.text : theme.textSecondary }]}>
-                    {startTime ? startTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'اختر الوقت'}
-                  </Text>
-                </TouchableOpacity>
-                {showTimePicker && (
+                {Platform.OS === 'web' ? (
+                  <View style={[styles.inputContainer, { paddingHorizontal: 12 }]}> 
+                    <Ionicons name="time" size={16} color={theme.textSecondary} style={styles.inputIcon} />
+                    {(() => {
+                      const d = startTime || new Date();
+                      const minutes = d.getMinutes();
+                      let hours24 = d.getHours();
+                      const isPM = hours24 >= 12;
+                      const hour12 = (hours24 % 12) || 12;
+                      const setFromParts = (h12, m, pm) => {
+                        const nd = new Date(startTime || new Date());
+                        let h24 = h12 % 12;
+                        if (pm) h24 += 12;
+                        if (!pm && h12 === 12) h24 = 0;
+                        nd.setHours(h24, m, 0, 0);
+                        setStartTime(nd);
+                      };
+                      const selectStyle = {
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
+                        MozAppearance: 'none',
+                        border: 'none',
+                        background: 'transparent',
+                        color: theme.text,
+                        fontSize: 16,
+                        padding: 8,
+                        marginRight: 4,
+                        outline: 'none',
+                        cursor: 'pointer'
+                      };
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+                          <select
+                            value={String(hour12)}
+                            onChange={(e) => setFromParts(Number(e.target.value), minutes, isPM)}
+                            style={selectStyle}
+                          >
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                              <option key={h} value={h}>{h}</option>
+                            ))}
+                          </select>
+                          <Text style={{ color: theme.text, fontSize: 16, paddingHorizontal: 2 }}>:</Text>
+                          <select
+                            value={String(minutes).padStart(2, '0')}
+                            onChange={(e) => setFromParts(hour12, Number(e.target.value), isPM)}
+                            style={selectStyle}
+                          >
+                            {Array.from({ length: 60 }, (_, i) => i).map(m => (
+                              <option key={m} value={String(m).padStart(2,'0')}>{String(m).padStart(2,'0')}</option>
+                            ))}
+                          </select>
+                          <select
+                            value={isPM ? 'PM' : 'AM'}
+                            onChange={(e) => setFromParts(hour12, minutes, e.target.value === 'PM')}
+                            style={{ ...selectStyle, marginLeft: 4 }}
+                          >
+                            <option value="AM">AM</option>
+                            <option value="PM">PM</option>
+                          </select>
+                        </div>
+                      );
+                    })()}
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.inputContainer}
+                    onPress={handleOpenTimePicker}
+                  >
+                    <Ionicons name="time" size={16} color={theme.textSecondary} style={styles.inputIcon} />
+                    <Text style={[styles.input, { color: startTime ? theme.text : theme.textSecondary }]}>
+                      {startTime ? startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'اختر الوقت'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {Platform.OS !== 'web' && showTimePicker && (
                   <DateTimePicker
                     value={startTime || new Date()}
                     mode="time"
@@ -649,7 +817,7 @@ export default function TripForm({ mode = 'submit', navigationParams = {} }) {
   );
 }
 
-const createStyles = (theme) => StyleSheet.create({
+const createStyles = (theme, { mapHeight, contentMaxWidth }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
@@ -668,7 +836,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    maxWidth: 400,
+    maxWidth: contentMaxWidth,
     alignSelf: 'center',
     width: '100%',
   },
@@ -690,8 +858,12 @@ const createStyles = (theme) => StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollContent: {
+    alignItems: 'center',
+  },
   mapCard: {
-    margin: 16,
+    marginHorizontal: 16,
+    marginTop: 16,
     marginBottom: 24,
     borderRadius: 12,
     overflow: 'hidden',
@@ -703,7 +875,7 @@ const createStyles = (theme) => StyleSheet.create({
     elevation: 3,
   },
   mapContainer: {
-    height: 192,
+    height: mapHeight,
     position: 'relative',
   },
   map: {
@@ -752,6 +924,8 @@ const createStyles = (theme) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    width: '100%',
+    maxWidth: contentMaxWidth,
   },
   cardContent: {
     padding: 16,

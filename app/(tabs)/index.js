@@ -2,6 +2,7 @@ import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, FlatList, Dimensions, ScrollView, Animated, Alert, Platform } from 'react-native';
+import { useResponsiveValue } from '@/constants/responsive';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/constants/ThemeContext';
 import { useAuth } from '@/constants/AuthContext';
@@ -113,7 +114,8 @@ export default function Home() {
     }
   };
 
-  const styles = createStyles(theme);
+  const contentMaxWidth = useResponsiveValue({ small: '100%', medium: 720, large: 960, default: '100%' });
+  const styles = createStyles(theme, { contentMaxWidth });
 
   // Show loading screen while auth is initializing
   if (authLoading) {
@@ -264,7 +266,7 @@ export default function Home() {
   );
 }
 
-const createStyles = (theme) => StyleSheet.create({
+const createStyles = (theme, { contentMaxWidth }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5', // Light gray background like web version
@@ -280,6 +282,7 @@ const createStyles = (theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
+    maxWidth: contentMaxWidth,
   },
   userButton: {
     padding: 8,
@@ -324,6 +327,9 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     justifyContent: 'center',
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: contentMaxWidth,
   },
   themeCard: {
     backgroundColor: 'white',

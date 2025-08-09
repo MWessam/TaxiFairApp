@@ -456,7 +456,7 @@ export default function FareResults() {
 
               )}
 
-              <Text style={styles.legalFareText}>التعريفة القانونية للمشوار هيه: {OFFICIAL_TARIFF_BASE_FARE} + {OFFICIAL_TARIFF_PER_KM} * {Number(params.distance || 0).toFixed(2)} = {Number(OFFICIAL_TARIFF_BASE_FARE + OFFICIAL_TARIFF_PER_KM * (params.distance || 0)).toFixed(2)} جنيه</Text>
+              {/* <Text style={styles.legalFareText}>التعريفة القانونية للمشوار هيه: {OFFICIAL_TARIFF_BASE_FARE} + {OFFICIAL_TARIFF_PER_KM} * {Number(params.distance || 0).toFixed(2)} = {Number(OFFICIAL_TARIFF_BASE_FARE + OFFICIAL_TARIFF_PER_KM * (params.distance || 0)).toFixed(2)} جنيه</Text> */}
 
             </View>
 
@@ -473,10 +473,10 @@ export default function FareResults() {
                   
                   return (
                     <>
-                      <Text style={styles.legalFareText}>
-                        التعريفة القانونية: {legalFare.toFixed(2)} جنيه
-                      </Text>
-                      {difference > 0 ? (
+                      {/* <Text style={styles.legalFareText}> */}
+                        {/* التعريفة القانونية: {legalFare.toFixed(2)} جنيه */}
+                      {/* </Text> */}
+                      {/* {difference > 0 ? (
                         <Text style={styles.overpaidText}>
                           دفعت أكثر من التعريفة القانونية بـ {Number(percentageDifference).toFixed(2)}% (+{difference.toFixed(2)} جنيه)
                         </Text>
@@ -488,17 +488,17 @@ export default function FareResults() {
                         <Text style={styles.exactFareText}>
                           دفعت التعريفة القانونية بالضبط
                         </Text>
-                      )}
+                      )} */}
                     </>
                   );
                 })()}
                 
-                {validationStatus === 'below_min_fare' && (
+                {/* {validationStatus === 'below_min_fare' && (
                   <Text style={styles.warningText}>تحذير: دفعت أقل مما يدفعه الناس عادة</Text>
                 )}
                 {validationStatus === 'above_max_fare' && (
                   <Text style={styles.warningText}>تحذير: دفعت أكثر مما يدفعه الناس عادة</Text>
-                )}
+                )} */}
                 <Text style={styles.successSubtext}>شكراً لمساهمتك في تحسين الخدمة</Text>
               </View>
             ) : (

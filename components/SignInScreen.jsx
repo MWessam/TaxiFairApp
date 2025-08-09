@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Pla
 import { useTheme } from '@/constants/ThemeContext';
 import { useAuth } from '@/constants/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import { useResponsiveValue } from '@/constants/responsive';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
@@ -74,7 +75,8 @@ export default function SignInScreen() {
     }
   };
 
-  const styles = createStyles(theme);
+  const contentMaxWidth = useResponsiveValue({ small: 400, medium: 560, large: 720, default: 400 });
+  const styles = createStyles(theme, { contentMaxWidth });
 
   return (
     <View style={styles.container}>
@@ -167,7 +169,7 @@ export default function SignInScreen() {
   );
 }
 
-const createStyles = (theme) => StyleSheet.create({
+const createStyles = (theme, { contentMaxWidth }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
@@ -186,7 +188,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    maxWidth: 400,
+    maxWidth: contentMaxWidth,
     alignSelf: 'center',
     width: '100%',
   },
@@ -202,10 +204,13 @@ const createStyles = (theme) => StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   logoContainer: {
     alignItems: 'center',
     marginBottom: 48,
+    width: '100%',
+    maxWidth: contentMaxWidth,
   },
   logoCircle: {
     width: 120,
@@ -234,6 +239,8 @@ const createStyles = (theme) => StyleSheet.create({
   },
   signInContainer: {
     marginBottom: 32,
+    width: '100%',
+    maxWidth: contentMaxWidth,
   },
   googleButton: {
     backgroundColor: '#4285F4',
@@ -303,6 +310,8 @@ const createStyles = (theme) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    width: '100%',
+    maxWidth: contentMaxWidth,
   },
   infoText: {
     fontSize: 16,
