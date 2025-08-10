@@ -17,14 +17,14 @@
   to = "/:splat"
   status = 301
   force = true
-  query = {fbclid = ":fbclid"}
+  conditions = {Query = ["fbclid"]}
 
 [[redirects]]
   from = "/*"
   to = "/:splat"
   status = 301
   force = true
-  query = {gclid = ":gclid"}
+  conditions = {Query = ["gclid"]}
 
 # Rule 2: Single Page App (SPA) Fallback.
 # This is the last rule. It serves your app's main index.html for any path
