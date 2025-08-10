@@ -1,40 +1,48 @@
+# This is the main build command and publish directory for your Expo web app.
 [build]
-  publish = "dist"
+  publish = "dist" # Or "web-build", verify your Expo output folder name
   command = "npx expo export --platform web"
-
-# Strip Facebook tracking parameters FIRST (before other redirects)
-[[redirects]]
-  from = "/*"
-  to = "/:splat"
-  status = 200
-  force = true
-  conditions = {Query = "fbclid"}
-
-# Specific redirect for Facebook link /lander
-[[redirects]]
-  from = "/lander"
-  to = "/"
-  status = 301
-  force = true
-
-# Handle bot crawlers differently - serve static content
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  conditions = {User-Agent = "!*bot*,!*crawler*,!*spider*,!*Googlebot*,!*AdsBot*"}
-
-# For bots, serve the main page directly
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  conditions = {User-Agent = "*bot*,*crawler*,*spider*,*Googlebot*,*AdsBot*"}
 
 [build.environment]
   NODE_VERSION = "18"
 
-# Headers for better SEO and security
+# --- REDIRECTS ---
+# All redirects are now consolidated here. The _redirects file should be deleted.
+# Netlify processes redirects from top to bottom. Specific rules must come before general rules.
+
+# Rule 1: Strip known tracking parameters from any URL.
+# This performs a 301 Permanent Redirect, which cleans the URL in the browser bar.
+# It redirects any path with a fbclid query parameter to the same path without it.
+[[redirects]]
+  from = "/*"
+  to = "/:splat"
+  status = 301
+  force = true # Ensures this runs even if a page exists at the URL
+  conditions = {Query = "fbclid"}
+
+[[redirects]]
+  from = "/*"
+  to = "/:splat"
+  status = 301
+  force = true
+  conditions = {Query = "gclid"}
+  
+# You can add more blocks like the one above for each utm_* parameter if needed.
+
+# Rule 2: Single Page App (SPA) Fallback.
+# This is the last rule. It serves your app's main index.html for any path
+# that did not match a previous redirect rule or a static file in the publish directory.
+# This allows your React Native Router to handle the routes.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  # No "force = true" here, so it doesn't override existing files like ads.txt
+
+# --- HEADERS ---
+# These are good for security and SEO. Your existing header rules are great.
+
+# General security headers for all pages
 [[headers]]
   for = "/*"
   [headers.values]
@@ -43,13 +51,13 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 
-# Cache static assets
+# Long-term caching for static assets
 [[headers]]
   for = "/static/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Allow crawlers
+# Correct content types for important files
 [[headers]]
   for = "/robots.txt"
   [headers.values]
