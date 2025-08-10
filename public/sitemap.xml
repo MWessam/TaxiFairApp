@@ -1,23 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://shimmering-starlight-00e08f.netlify.app/</loc>
+    <loc>https://kamelogra.com/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://shimmering-starlight-00e08f.netlify.app/PlacePicker</loc>
+    <loc>https://kamelogra.com/PlacePicker</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://shimmering-starlight-00e08f.netlify.app/SubmitTrip</loc>
+    <loc>https://kamelogra.com/SubmitTrip</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://shimmering-starlight-00e08f.netlify.app/FareResults</loc>
+    <loc>https://kamelogra.com/FareResults</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://kamelogra.com/ads.txt</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url>
 </urlset>

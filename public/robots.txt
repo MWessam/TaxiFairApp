@@ -7,4 +7,4 @@ Allow: /
 User-agent: AdsBot-Google
 Allow: /
 
-Sitemap: https://shimmering-starlight-00e08f.netlify.app/sitemap.xml
+Sitemap: https://kamelogra.com/sitemap.xml
