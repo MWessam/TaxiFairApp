@@ -10,29 +10,25 @@
 # All redirects are now consolidated here. The _redirects file should be deleted.
 # Netlify processes redirects from top to bottom. Specific rules must come before general rules.
 
-# Rule 1: Strip known tracking parameters from any URL.
-# This performs a 301 Permanent Redirect, which cleans the URL in the browser bar.
-# It redirects any path with a fbclid query parameter to the same path without it.
+# Rule 1: Strip tracking parameters from URLs
+# These perform 301 Permanent Redirects, which clean the URL in the browser bar
 [[redirects]]
   from = "/*"
   to = "/:splat"
   status = 301
-  force = true # Ensures this runs even if a page exists at the URL
-  conditions = {Query = "fbclid"}
+  force = true
+  query = {fbclid = ":fbclid"}
 
 [[redirects]]
   from = "/*"
   to = "/:splat"
   status = 301
   force = true
-  conditions = {Query = "gclid"}
-  
-# You can add more blocks like the one above for each utm_* parameter if needed.
+  query = {gclid = ":gclid"}
 
 # Rule 2: Single Page App (SPA) Fallback.
 # This is the last rule. It serves your app's main index.html for any path
 # that did not match a previous redirect rule or a static file in the publish directory.
-# This allows your React Native Router to handle the routes.
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -40,7 +36,7 @@
   # No "force = true" here, so it doesn't override existing files like ads.txt
 
 # --- HEADERS ---
-# These are good for security and SEO. Your existing header rules are great.
+# These are good for security and SEO.
 
 # General security headers for all pages
 [[headers]]
