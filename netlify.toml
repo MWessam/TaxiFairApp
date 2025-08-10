@@ -2,12 +2,13 @@
   publish = "dist"
   command = "npx expo export --platform web"
 
-# Handle bot crawlers differently - serve static content
+# Strip Facebook tracking parameters FIRST (before other redirects)
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/:splat"
   status = 200
-  conditions = {User-Agent = "!*bot*,!*crawler*,!*spider*,!*Googlebot*,!*AdsBot*"}
+  force = true
+  conditions = {Query = "fbclid"}
 
 # Specific redirect for Facebook link /lander
 [[redirects]]
@@ -16,13 +17,12 @@
   status = 301
   force = true
 
-# Strip Facebook tracking parameters that break the site
+# Handle bot crawlers differently - serve static content
 [[redirects]]
   from = "/*"
-  to = "/:splat"
+  to = "/index.html"
   status = 200
-  force = true
-  conditions = {Query = "fbclid"}
+  conditions = {User-Agent = "!*bot*,!*crawler*,!*spider*,!*Googlebot*,!*AdsBot*"}
 
 # For bots, serve the main page directly
 [[redirects]]
