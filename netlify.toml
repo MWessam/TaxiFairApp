@@ -9,6 +9,21 @@
   status = 200
   conditions = {User-Agent = "!*bot*,!*crawler*,!*spider*,!*Googlebot*,!*AdsBot*"}
 
+# Specific redirect for Facebook link /lander
+[[redirects]]
+  from = "/lander"
+  to = "/"
+  status = 301
+  force = true
+
+# Strip Facebook tracking parameters that break the site
+[[redirects]]
+  from = "/*"
+  to = "/:splat"
+  status = 200
+  force = true
+  conditions = {Query = "fbclid"}
+
 # For bots, serve the main page directly
 [[redirects]]
   from = "/*"
