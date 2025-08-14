@@ -1,0 +1,113 @@
+[debug] [2025-08-14T21:08:51.210Z] ----------------------------------------------------------------------
+[debug] [2025-08-14T21:08:51.213Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Medow\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2025-08-14T21:08:51.213Z] CLI Version:   14.11.1
+[debug] [2025-08-14T21:08:51.213Z] Platform:      win32
+[debug] [2025-08-14T21:08:51.213Z] Node Version:  v22.14.0
+[debug] [2025-08-14T21:08:51.214Z] Time:          Fri Aug 15 2025 00:08:51 GMT+0300 (Oost-Europese zomertijd)
+[debug] [2025-08-14T21:08:51.214Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-08-14T21:08:51.368Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-08-14T21:08:51.369Z] > authorizing via signed-in user (docstarvingwild@gmail.com)
+[debug] [2025-08-14T21:08:51.369Z] [iam] checking project taxifare-7fe53 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2025-08-14T21:08:51.370Z] Checked if tokens are valid: false, expires at: 1755200761381
+[debug] [2025-08-14T21:08:51.370Z] Checked if tokens are valid: false, expires at: 1755200761381
+[debug] [2025-08-14T21:08:51.370Z] > refreshing access token with scopes: []
+[debug] [2025-08-14T21:08:51.371Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-08-14T21:08:51.371Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-08-14T21:08:51.747Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-08-14T21:08:51.748Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-08-14T21:08:51.765Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions [none]
+[debug] [2025-08-14T21:08:51.765Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions x-goog-quota-user=projects/taxifare-7fe53
+[debug] [2025-08-14T21:08:51.765Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-08-14T21:08:52.795Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions 200
+[debug] [2025-08-14T21:08:52.796Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2025-08-14T21:08:52.796Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:08:52.796Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:08:52.796Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/taxifare-7fe53/serviceAccounts/taxifare-7fe53@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2025-08-14T21:08:52.796Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/taxifare-7fe53/serviceAccounts/taxifare-7fe53@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2025-08-14T21:08:53.916Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/taxifare-7fe53/serviceAccounts/taxifare-7fe53@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2025-08-14T21:08:53.917Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/taxifare-7fe53/serviceAccounts/taxifare-7fe53@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'taxifare-7fe53'...
+[info] 
+[info] i  deploying functions 
+[debug] [2025-08-14T21:08:53.921Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:08:53.921Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:08:53.921Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53 [none]
+[debug] [2025-08-14T21:08:54.223Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53 200
+[debug] [2025-08-14T21:08:54.223Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53 {"projectNumber":"916645906844","projectId":"taxifare-7fe53","lifecycleState":"ACTIVE","name":"TaxiFare","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-07-25T13:04:52.249323Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2025-08-14T21:08:54.225Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:08:54.225Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:08:54.226Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/taxifare-7fe53/adminSdkConfig [none]
+[debug] [2025-08-14T21:08:54.899Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/taxifare-7fe53/adminSdkConfig 200
+[debug] [2025-08-14T21:08:54.899Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/taxifare-7fe53/adminSdkConfig {"projectId":"taxifare-7fe53","storageBucket":"taxifare-7fe53.firebasestorage.app"}
+[debug] [2025-08-14T21:08:54.899Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:08:54.899Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:08:54.899Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/taxifare-7fe53/configs [none]
+[debug] [2025-08-14T21:08:55.587Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/taxifare-7fe53/configs 200
+[debug] [2025-08-14T21:08:55.587Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/taxifare-7fe53/configs {}
+[debug] [2025-08-14T21:08:55.589Z] Validating nodejs source
+[warn] !  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] !  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2025-08-14T21:08:56.952Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "backfill:h3": "node scripts/backfill-h3-zones.js",
+    "test": "jest"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.1.0",
+    "h3-js": "^4.2.1",
+    "point-in-polygon": "^1.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "firebase-functions-test": "^3.1.0",
+    "jest": "^29.7.0"
+  },
+  "private": true
+}
+[debug] [2025-08-14T21:08:56.952Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase default to determine what to deploy 
+[debug] [2025-08-14T21:08:56.953Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-08-14T21:08:56.962Z] Found firebase-functions binary at 'D:\_Keep\TaxiProject\TaxiFairMock\functions\node_modules\.bin\firebase-functions'
+[info] Serving at port 8304
+
+[debug] [2025-08-14T21:08:57.700Z] Got response from /__/functions.yaml {"endpoints":{"submitTrip":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"callableTrigger":{},"entryPoint":"submitTrip"},"analyzeSimilarTrips":{"availableMemoryMb":512,"timeoutSeconds":60,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"callableTrigger":{},"entryPoint":"analyzeSimilarTrips"},"setUserRole":{"availableMemoryMb":256,"timeoutSeconds":30,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"callableTrigger":{},"entryPoint":"setUserRole"},"getUserRole":{"availableMemoryMb":256,"timeoutSeconds":30,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"callableTrigger":{},"entryPoint":"getUserRole"},"backfillH3Zones":{"availableMemoryMb":1024,"timeoutSeconds":540,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"callableTrigger":{},"entryPoint":"backfillH3Zones"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[info] i  extensions: ensuring required API firebaseextensions.googleapis.com is enabled... 
+[debug] [2025-08-14T21:09:01.727Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-08-14T21:09:01.727Z] > authorizing via signed-in user (docstarvingwild@gmail.com)
+[debug] [2025-08-14T21:09:01.727Z] [iam] checking project taxifare-7fe53 for permissions ["firebase.projects.get","firebaseextensions.instances.list"]
+[debug] [2025-08-14T21:09:01.727Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:09:01.727Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:09:01.727Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions [none]
+[debug] [2025-08-14T21:09:01.727Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions x-goog-quota-user=projects/taxifare-7fe53
+[debug] [2025-08-14T21:09:01.727Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions {"permissions":["firebase.projects.get","firebaseextensions.instances.list"]}
+[debug] [2025-08-14T21:09:02.814Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions 200
+[debug] [2025-08-14T21:09:02.814Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/taxifare-7fe53:testIamPermissions {"permissions":["firebase.projects.get","firebaseextensions.instances.list"]}
+[debug] [2025-08-14T21:09:02.815Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:09:02.815Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:09:02.815Z] >>> [apiv2][query] GET https://firebaseextensions.googleapis.com/v1beta/projects/taxifare-7fe53/instances pageSize=100&pageToken=
+[debug] [2025-08-14T21:09:04.085Z] <<< [apiv2][status] GET https://firebaseextensions.googleapis.com/v1beta/projects/taxifare-7fe53/instances 200
+[debug] [2025-08-14T21:09:04.085Z] <<< [apiv2][body] GET https://firebaseextensions.googleapis.com/v1beta/projects/taxifare-7fe53/instances {}
+[info] i  functions: Loaded environment variables from .env. 
+[info] i  functions: preparing functions directory for uploading... 
+[info] i  functions: packaged D:\_Keep\TaxiProject\TaxiFairMock\functions (99.4 KB) for uploading 
+[debug] [2025-08-14T21:09:04.159Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:09:04.159Z] Checked if tokens are valid: true, expires at: 1755209330748
+[debug] [2025-08-14T21:09:04.159Z] >>> [apiv2][query] GET https://cloudfunctions.googleapis.com/v1/projects/taxifare-7fe53/locations/-/functions [none]

@@ -310,17 +310,15 @@ export default function FareResults() {
       };
     }
     
-    // Transform Firebase data structure to chart format
+    // Transform Firebase data structure to chart format (fallbacks)
     const transformTimeBasedData = (timeData) => {
       if (!timeData || typeof timeData !== 'object') return [];
-      
       const timeMapping = {
         morning: '6-12 ص',
         afternoon: '12-6 ع', 
         evening: '6-12 م',
         night: '12-6 ص'
       };
-      
       return Object.entries(timeData)
         .filter(([_, value]) => value.count > 0)
         .map(([key, value]) => ({
@@ -368,14 +366,23 @@ export default function FareResults() {
         }));
     };
 
+    // Prefer server-computed fields when available
+    const similarTripsData = Array.isArray(data.bellCurveBins) && data.bellCurveBins.length > 0
+      ? data.bellCurveBins.map(b => ({ distance: b.distance, avgFare: Number(b.avgFare) }))
+      : transformDistanceBasedData(data.distanceBasedAverage);
+
+    const timeBasedData = Array.isArray(data.timeBins3h) && data.timeBins3h.length > 0
+      ? data.timeBins3h.map(t => ({ time: t.time, avgFare: Number(t.avgFare) }))
+      : transformTimeBasedData(data.timeBasedAverage);
+
     return {
       hasData: true,
-      similarTripsData: transformDistanceBasedData(data.distanceBasedAverage),
-      timeBasedData: transformTimeBasedData(data.timeBasedAverage),
+      similarTripsData,
+      timeBasedData,
       weeklyData: transformDayBasedData(data.dayBasedAverage),
       averageFare: Number(data.averageFare || 45).toFixed(2),
       estimatedFare: Number(data.estimatedFare || 0).toFixed(2),
-      fareRange: data.fareRange || { min: 25, max: 65 }
+      fareRange: data.fareRange
     };
   };
 
@@ -447,14 +454,16 @@ export default function FareResults() {
                 <ActivityIndicator size="small" color={theme.primary} />
               )}
               {!loadingAnalysis && analysisData && analysisData.data && (
-                analysisData.data.estimatedFare && analysisData.data.estimatedFare !== 0 ?
-                              <Text style={styles.estimatedFare}>
-                {Number(analysisData.data.estimatedFare).toFixed(2)} جنيه
-              </Text>
-                :
-                <Text style={styles.estimatedFareNotFound}>
-                  لا توجد رحلات او بيانات كافية لتحليل رحلتك
-                </Text>
+                analysisData.data.estimatedFare && analysisData.data.estimatedFare !== 0 ? (
+                  <Text style={styles.estimatedFare}>
+                    {Number(analysisData.data.estimatedFare).toFixed(2)} جنيه
+                  </Text>
+                ) : (
+                  <Text style={styles.estimatedFareNotFound}>
+                    لا يوجد تقدير تلقائي للسعر حالياً.
+                    يمكن الاعتماد على الرسوم البيانية بالأسفل للحصول على تقدير تقريبي مبني على الرحلات المشابهة.
+                  </Text>
+                )
 
               )}
 

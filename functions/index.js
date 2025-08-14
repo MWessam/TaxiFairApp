@@ -33,6 +33,102 @@ const OFFICIAL_TARIFF_PER_KM = 2;
 const OFFICIAL_TARIFF_MIN_PERCENT_MODIFIER = 0.15;
 const OFFICIAL_TARIFF_MAX_PERCENT_MODIFIER = 1.0;
 
+// Governorate tariff lookup (defaults mirror national values; adjust per governorate as needed)
+const DEFAULT_TARIFF = {
+  base: OFFICIAL_TARIFF_BASE_FARE,
+  perKm: OFFICIAL_TARIFF_PER_KM,
+  minModifier: OFFICIAL_TARIFF_MIN_PERCENT_MODIFIER,
+  maxModifier: OFFICIAL_TARIFF_MAX_PERCENT_MODIFIER
+};
+
+// Canonical tariff table keyed by normalized governorate name (lowercase)
+// NOTE: Replace values with the officially published tariffs per governorate when available
+const GOVERNORATE_TARIFFS = {
+  'cairo': { base: 9, perKm: 2.5, minModifier: 0.15, maxModifier: 1.0 },
+  'giza': { base: 9, perKm: 2.3, minModifier: 0.15, maxModifier: 1.0 },
+  'alexandria': { base: 10, perKm: 2.6, minModifier: 0.15, maxModifier: 1.0 },
+  'dakahlia': { base: 8, perKm: 2.0, minModifier: 0.15, maxModifier: 1.0 },
+  'red sea': { base: 12, perKm: 3.0, minModifier: 0.15, maxModifier: 1.0 },
+  'beheira': { base: 8, perKm: 2.0, minModifier: 0.15, maxModifier: 1.0 },
+  'fayoum': { base: 7, perKm: 1.8, minModifier: 0.15, maxModifier: 1.0 },
+  'gharbia': { base: 8, perKm: 2.0, minModifier: 0.15, maxModifier: 1.0 },
+  'ismailia': { base: 9, perKm: 2.2, minModifier: 0.15, maxModifier: 1.0 },
+  'menofia': { base: 7, perKm: 1.9, minModifier: 0.15, maxModifier: 1.0 },
+  'minya': { base: 7, perKm: 1.8, minModifier: 0.15, maxModifier: 1.0 },
+  'qalyubia': { base: 8, perKm: 2.1, minModifier: 0.15, maxModifier: 1.0 },
+  'new valley': { base: 7, perKm: 1.7, minModifier: 0.15, maxModifier: 1.0 },
+  'suez': { base: 9, perKm: 2.2, minModifier: 0.15, maxModifier: 1.0 },
+  'aswan': { base: 8, perKm: 2.1, minModifier: 0.15, maxModifier: 1.0 },
+  'assiut': { base: 7, perKm: 1.9, minModifier: 0.15, maxModifier: 1.0 },
+  'beni suef': { base: 7, perKm: 1.8, minModifier: 0.15, maxModifier: 1.0 },
+  'port said': { base: 9, perKm: 2.3, minModifier: 0.15, maxModifier: 1.0 },
+  'damietta': { base: 8, perKm: 2.0, minModifier: 0.15, maxModifier: 1.0 },
+  'sharkia': { base: 8, perKm: 2.0, minModifier: 0.15, maxModifier: 1.0 },
+  'south sinai': { base: 12, perKm: 3.2, minModifier: 0.15, maxModifier: 1.0 },
+  'kafr el sheikh': { base: 8, perKm: 2.0, minModifier: 0.15, maxModifier: 1.0 },
+  'matrouh': { base: 10, perKm: 2.6, minModifier: 0.15, maxModifier: 1.0 },
+  'luxor': { base: 9, perKm: 2.4, minModifier: 0.15, maxModifier: 1.0 },
+  'qena': { base: 8, perKm: 2.0, minModifier: 0.15, maxModifier: 1.0 },
+  'north sinai': { base: 11, perKm: 3.0, minModifier: 0.15, maxModifier: 1.0 },
+  'sohag': { base: 7, perKm: 1.9, minModifier: 0.15, maxModifier: 1.0 }
+};
+
+// Aliases to map common spellings to canonical keys
+const GOVERNORATE_ALIASES = {
+  'al qalyubiyah': 'qalyubia', 'qalyubiyah': 'qalyubia', 'qaliubiya': 'qalyubia',
+  'kafr el-sheikh': 'kafr el sheikh', 'kafr ash shaykh': 'kafr el sheikh',
+  'menoufia': 'menofia', 'monufia': 'menofia',
+  'ash sharqia': 'sharkia', 'sharqia': 'sharkia',
+  'al buhairah': 'beheira', 'behera': 'beheira',
+  'al giza': 'giza', 'al jizah': 'giza',
+  'al qahirah': 'cairo',
+  'al iskandariyah': 'alexandria',
+  'al ismailiyah': 'ismailia',
+  'dumiyat': 'damietta',
+  'al bahr al ahmar': 'red sea', 'redsea': 'red sea',
+  'al wadi al jadid': 'new valley', 'newvalley': 'new valley',
+  'banisuef': 'beni suef', 'bani suef': 'beni suef',
+  'asiyut': 'assiut',
+  'janub sina': 'south sinai', 'shamal sina': 'north sinai',
+  // Common city-to-governorate fallbacks
+  'mansoura': 'dakahlia',
+  'tanta': 'gharbia',
+  'zagazig': 'sharkia',
+  'shebin el-kom': 'menofia', 'shebin el kom': 'menofia',
+  'banha': 'qalyubia',
+  'bensuef': 'beni suef'
+};
+
+function normalizeGovernorateName(name) {
+  if (!name || typeof name !== 'string') return '';
+  const lower = name.trim().toLowerCase();
+  const cleaned = lower.replace(/gov(er(norate)?)?\.?/g, '').replace(/\s+/g, ' ').trim();
+  const alias = GOVERNORATE_ALIASES[cleaned];
+  return (alias || cleaned);
+}
+
+function getTariffForGovernorate(name) {
+  const key = normalizeGovernorateName(name);
+  return GOVERNORATE_TARIFFS[key] || DEFAULT_TARIFF;
+}
+
+async function resolveGovernorateFromCoords(lat, lng) {
+  try {
+    if (!lat || !lng) return '';
+    const token = process.env.MAPBOX_ACCESS_TOKEN;
+    if (!token) return '';
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?types=region&language=en&access_token=${encodeURIComponent(token)}`;
+    const res = await fetch(url);
+    if (!res.ok) return '';
+    const data = await res.json();
+    const feature = Array.isArray(data.features) && data.features[0];
+    const text = feature && (feature.text || feature.place_name);
+    return text || '';
+  } catch (_err) {
+    return '';
+  }
+}
+
 // New constants for trip validation
 const DUPLICATE_TRIP_TIME_WINDOW = 30 * 60 * 1000; // 30 minutes in milliseconds
 const SAME_ZONE_DESTINATION_WINDOW = 30 * 60 * 1000; // 30 minutes for same zone trips
@@ -83,6 +179,128 @@ const calculateIQR = (arr) => {
     };
 };
 // Zone determination is handled by H3 hex indexing
+
+// --- Robust statistics helpers (median & MAD) ---
+function calculateMedian(values) {
+  if (!values || values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 0) return (sorted[mid - 1] + sorted[mid]) / 2;
+  return sorted[mid];
+}
+
+function calculateMAD(values, median) {
+  if (!values || values.length === 0 || median == null) return null;
+  const deviations = values.map(v => Math.abs(v - median));
+  const mad = calculateMedian(deviations);
+  return mad == null ? null : mad;
+}
+
+// Build a coarse signature of a trip used for analysis
+function computeTripSignature(trip, mlFeatures) {
+  const fromZone = mlFeatures.from_zone || (trip.from?.lat && trip.from?.lng ? computeH3Zone(trip.from.lat, trip.from.lng) : 'unknown');
+  const toZone = mlFeatures.to_zone || (trip.to?.lat && trip.to?.lng ? computeH3Zone(trip.to.lat, trip.to.lng) : 'unknown');
+  const distanceBucket = typeof trip.distance === 'number' ? Math.max(0, Math.round(trip.distance)) : 'd0';
+  let hourBucket = 'hX';
+  if (mlFeatures.time_of_day != null) {
+    hourBucket = `h${Math.max(0, Math.min(23, Math.floor(mlFeatures.time_of_day)))}`;
+  } else if (trip.start_time) {
+    const h = new Date(trip.start_time).getHours();
+    hourBucket = `h${Math.max(0, Math.min(23, h))}`;
+  }
+  return `${fromZone}|${toZone}|${distanceBucket}|${hourBucket}`;
+}
+
+// Compute suspicion score and reasons for a trip (handles cold start)
+async function computeSuspicionInfo(data, mlFeatures, userId) {
+  const reasons = [];
+  let suspiciousScore = 0;
+  let expectedFare = null;
+  let weight = 1.0;
+
+  const distanceKm = data.distance || 0;
+  const farePerKm = distanceKm > 0 ? (data.fare / distanceKm) : null;
+
+  // Always apply global baseline priors (even when we have history)
+  const BASELINE_BASE_EGP = Number(process.env.BASELINE_BASE_EGP || 10);
+  const BASELINE_PER_KM_EGP = Number(process.env.BASELINE_PER_KM_EGP || 3);
+  expectedFare = BASELINE_BASE_EGP + BASELINE_PER_KM_EGP * distanceKm;
+  if (isFinite(expectedFare) && expectedFare > 0) {
+    if (data.fare < 0.9 * expectedFare) { suspiciousScore += 20; reasons.push('far_below_global_baseline'); }
+    if (data.fare > 2.4 * expectedFare) { suspiciousScore += 20; reasons.push('far_above_global_baseline'); }
+  }
+
+  // Try route-specific historical fares
+  let fares = [];
+  if (mlFeatures.from_zone && mlFeatures.to_zone) {
+    const snapshot = await getSimilarTripsQuery(mlFeatures.from_zone, mlFeatures.to_zone).get();
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      if (typeof d.fare === 'number' && d.fare > 0) {
+        // Optional coarse distance/time filter
+        if (distanceKm && d.distance) {
+          const pctDiff = Math.abs(d.distance - distanceKm) / distanceKm;
+          if (pctDiff > 0.25) return;
+        }
+        if (data.start_time && d.start_time) {
+          const ourHour = new Date(data.start_time).getHours();
+          const theirHour = new Date(d.start_time).getHours();
+          if (Math.abs(ourHour - theirHour) > 3) return;
+        }
+        fares.push(d.fare);
+      }
+    });
+  }
+
+  // Physics and geometry checks (always-on)
+  if (distanceKm && data.duration) {
+    const speed = (distanceKm / data.duration) * 60;
+    if (speed < 5 || speed > 120) {
+      suspiciousScore += 15; reasons.push('implausible_speed');
+    }
+  }
+  if (mlFeatures.from_zone && mlFeatures.to_zone && mlFeatures.from_zone === mlFeatures.to_zone && distanceKm > 5) {
+    suspiciousScore += 10; reasons.push('same_zone_large_distance');
+  }
+
+  // Duplicate-ish user check
+  try {
+    const isDup = await checkDuplicateTrip({ ...data, ...mlFeatures }, userId);
+    if (isDup) { suspiciousScore += 20; reasons.push('near_duplicate'); }
+  } catch (_) {}
+
+  // Historical route-based robust checks (IQR & MAD) when enough data
+  if (fares.length >= 4) {
+    const iqrStats = calculateIQR(fares);
+    const median = calculateMedian(fares);
+    const mad = calculateMAD(fares, median);
+    if (iqrStats && (data.fare < iqrStats.lowerBound || data.fare > iqrStats.upperBound)) {
+      suspiciousScore += 25; reasons.push('fare_outside_iqr');
+    }
+    if (mad && mad > 0) {
+      const zRobust = Math.abs(data.fare - median) / (1.4826 * mad);
+      if (zRobust > 3) { suspiciousScore += 30; reasons.push('fare_outside_mad'); }
+    }
+    weight = 1.0;
+  } else {
+    // Cold start: use global baseline and distance bands
+    const band = distanceKm <= 5 ? 'short' : distanceKm <= 15 ? 'medium' : 'long';
+    const bandMaxPerKm = band === 'short' ? 8 : band === 'medium' ? 6 : 5;
+    const bandMinPerKm = 0.7;
+    if (farePerKm != null) {
+      if (farePerKm < bandMinPerKm) { suspiciousScore += 15; reasons.push('below_band_per_km'); }
+      if (farePerKm > bandMaxPerKm) { suspiciousScore += 15; reasons.push('above_band_per_km'); }
+    }
+
+    weight = 0.5; // down-weight cold-start contributions
+  }
+
+  const signature = computeTripSignature(data, mlFeatures);
+  const suspicious = suspiciousScore >= 30;
+
+  return { suspicious, suspicious_score: suspiciousScore, suspicious_reasons: reasons, signature, weight, expected_fare: expectedFare };
+}
+
 
 // Function to extract ML features from trip data
 function extractMLFeatures(tripData) {
@@ -558,30 +776,12 @@ exports.submitTrip = onCall({
       // }
     }
 
-    // --- Official tariff validation ---
-    const officialFare = OFFICIAL_TARIFF_BASE_FARE + OFFICIAL_TARIFF_PER_KM * data.distance;
-    const minAllowedFare = officialFare * (1 + OFFICIAL_TARIFF_MIN_PERCENT_MODIFIER);
-    const maxAllowedFare = officialFare * (1 + OFFICIAL_TARIFF_MAX_PERCENT_MODIFIER);
 
+    // Robust suspicion scoring (cold-start aware)
+    const suspicionInfo = await computeSuspicionInfo(data, mlFeatures, userId);
     let validationStatus = 'accepted';
-    let suspicious = false;
-    if (data.fare < minAllowedFare) {
-      console.log('Fare below allowed minimum', data.fare, minAllowedFare);
-      validationStatus = 'below_min_fare';
-      suspicious = true;
-    } else if (data.fare > maxAllowedFare) {
-      console.log('Fare above allowed maximum', data.fare, maxAllowedFare);
-      validationStatus = 'above_max_fare';
-      suspicious = true;
-    }
-
-    if (validationStatus !== 'accepted') {
-      // Attempt fallback using similar trips statistics
-      const withinSimilar = await isFareWithinSimilarRange(data, mlFeatures);
-      if (withinSimilar) {
-        validationStatus = 'accepted';
-        suspicious = false; // No longer suspicious if passes similarity check
-      }
+    if (suspicionInfo.suspicious) {
+      validationStatus = 'suspicious';
     }
 
     // Add metadata and ML features
@@ -592,12 +792,16 @@ exports.submitTrip = onCall({
       submitted_at: admin.firestore.FieldValue.serverTimestamp(),
       ip_address: hashIp(request.ip),
       user_agent: request.headers?.['user-agent'] || 'unknown',
-      suspicious: suspicious,
-      validation_status: validationStatus,
-      official_fare: officialFare,
-      min_allowed_fare: minAllowedFare,
-      max_allowed_fare: maxAllowedFare,
-      is_admin_submission: isAdmin
+      suspicious: suspicionInfo.suspicious,
+      suspicious_score: suspicionInfo.suspicious_score,
+      suspicious_reasons: suspicionInfo.suspicious_reasons,
+      signature: suspicionInfo.signature,
+      weight: suspicionInfo.weight,
+      expected_fare: suspicionInfo.expected_fare,
+      validation_status: 'accepted',
+      is_admin_submission: isAdmin,
+      // Store resolved canonical governorate when available
+      // governorate: resolvedGovernorate ? normalizeGovernorateName(resolvedGovernorate) : (data.governorate || '')
     };
 
     // Save to Firestore
@@ -609,15 +813,14 @@ exports.submitTrip = onCall({
 
     return {
       success: true,
-      status: validationStatus,
+      status: 'accepted',
       trip_id: docRef.id,
-      message: validationStatus === 'accepted'
-        ? 'Trip submitted successfully'
-        : (validationStatus === 'below_min_fare'
-            ? 'Fare below allowed minimum'
-            : 'Fare above allowed maximum'),
-      ml_features: mlFeatures, // Return ML features for debugging
-      is_admin: isAdmin
+      message: 'Trip submitted successfully',
+      ml_features: mlFeatures,
+      is_admin: isAdmin,
+      suspicious: suspicionInfo.suspicious,
+      suspicious_score: suspicionInfo.suspicious_score,
+      suspicious_reasons: suspicionInfo.suspicious_reasons
     };
     
   } catch (error) {
@@ -648,7 +851,7 @@ exports.analyzeSimilarTrips = onCall({
   }
   
   try {
-    // Get user ID for rate limiting
+    // Rate limiting removed by request; keep auth context if needed
     const userId = data.user_id || (context ? context.uid : null);
     
     if (userId) {
@@ -774,13 +977,14 @@ exports.analyzeSimilarTrips = onCall({
       });
     }
 
-    // If governorate is available, filter by it
-    if (governorate) {
-      tripsQuery = tripsQuery.where('governorate', '==', governorate);
-      if (process.env.DEBUG_LOGS === 'true') {
-        console.log('Added governorate filter:', governorate);
-      }
-    }
+    // If governorate is available, filter by normalized value
+    // if (governorate) {
+    //   const normalizedGov = normalizeGovernorateName(governorate);
+    //   tripsQuery = tripsQuery.where('governorate', '==', normalizedGov);
+    //   if (process.env.DEBUG_LOGS === 'true') {
+    //     console.log('Added governorate filter (normalized):', normalizedGov);
+    //   }
+    // }
 
     if (process.env.DEBUG_LOGS === 'true') {
       console.log('Executing Firestore query...');
@@ -914,6 +1118,63 @@ exports.analyzeSimilarTrips = onCall({
     
     // Calculate statistics (same logic as before)
     const analysis = calculateTripStatistics(filteredTrips);
+
+    // Build 3-hour time bins from filtered trips
+    const buildTimeBins3h = (tripsForBins) => {
+      const bins = Array.from({ length: 8 }, (_, i) => ({
+        label: `${String(i*3).padStart(2,'0')}:00-${String((i+1)*3).padStart(2,'0')}:00`,
+        total: 0,
+        count: 0
+      }));
+      for (const t of tripsForBins) {
+        if (!t || !t.start_time || typeof t.fare !== 'number') continue;
+        const h = new Date(t.start_time).getHours();
+        const idx = Math.min(7, Math.max(0, Math.floor(h / 3)));
+        bins[idx].total += t.fare;
+        bins[idx].count += 1;
+      }
+      return bins.filter(b => b.count > 0).map(b => ({ time: b.label, avgFare: Math.round((b.total / b.count) * 100) / 100 }));
+    };
+
+    // Build bell-curve-like ±σ bins from fare distribution
+    const buildBellCurveBins = (fareDistribution, averageFare, fareRange) => {
+      if (!Array.isArray(fareDistribution) || fareDistribution.length === 0) return [];
+      const mean = Number(averageFare) || 0;
+      const min = Number(fareRange?.min ?? 0);
+      const max = Number(fareRange?.max ?? 0);
+      const range = Math.max(0, max - min);
+      const sigma = range > 0 ? range / 6 : 0; // approx 6σ across min..max
+      if (sigma === 0) return [];
+
+      const bins = [
+        { label: '-3σ .. -2σ', from: mean - 3*sigma, to: mean - 2*sigma, count: 0 },
+        { label: '-2σ .. -1σ', from: mean - 2*sigma, to: mean - 1*sigma, count: 0 },
+        { label: '-1σ .. +1σ', from: mean - 1*sigma, to: mean + 1*sigma, count: 0 },
+        { label: '+1σ .. +2σ', from: mean + 1*sigma, to: mean + 2*sigma, count: 0 },
+        { label: '+2σ .. +3σ', from: mean + 2*sigma, to: mean + 3*sigma, count: 0 }
+      ];
+
+      const parseRange = (r) => {
+        if (!r || typeof r !== 'string' || !r.includes('-')) return null;
+        const [a, b] = r.split('-').map(n => Number(n));
+        if (!isFinite(a) || !isFinite(b)) return null;
+        return { a: Math.min(a,b), b: Math.max(a,b) };
+      };
+
+      for (const bucket of analysis.fareDistribution) {
+        const pr = parseRange(bucket.range);
+        if (!pr) continue;
+        const center = (pr.a + pr.b) / 2;
+        const cnt = Number(bucket.count || 0);
+        for (const bin of bins) {
+          if (center >= bin.from && center < bin.to) {
+            bin.count += cnt;
+            break;
+          }
+        }
+      }
+      return bins.filter(b => b.count > 0).map(b => ({ distance: b.label, avgFare: b.count }));
+    };
     
     if (process.env.DEBUG_LOGS === 'true') {
       console.log('Analysis completed successfully');
@@ -926,6 +1187,10 @@ exports.analyzeSimilarTrips = onCall({
       success: true,
       data: {
         ...analysis,
+        // 3-hour time bins for client display
+        timeBins3h: buildTimeBins3h(filteredTrips),
+        // Bell-curve-like ±σ bins derived from fare distribution
+        bellCurveBins: buildBellCurveBins(analysis.fareDistribution, analysis.averageFare, analysis.fareRange),
         estimatedFare: Math.round(estimatedFare * 100) / 100
       }
     };
