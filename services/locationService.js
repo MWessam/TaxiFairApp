@@ -106,26 +106,13 @@ class LocationService {
         this.locationStatus = 'denied';
         this.notifyListeners();
         
-        // More specific error message for different scenarios
-        let message = 'This app needs precise location access to accurately track your taxi rides.';
-        let title = 'Location Permission Required';
-        
+        // Don't show alerts for permission issues - just log and continue
+        console.log('Location permission not granted:', status);
         if (status === 'denied') {
-          title = 'Permission Denied';
-          message = 'Location permission was denied. Please enable it in settings to use this app.';
+          console.log('Location permission was denied');
         } else if (status === 'undetermined') {
-          title = 'Permission Not Determined';
-          message = 'Please grant location permission to use this app.';
+          console.log('Location permission not determined');
         }
-        
-        Alert.alert(
-          title,
-          message,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() }
-          ]
-        );
         return null;
       }
     } catch (error) {
@@ -134,16 +121,13 @@ class LocationService {
       
       console.error('Error requesting location permission:', error);
       
-      // Handle specific error cases
-      let errorMessage = 'Failed to get location. Please check your location settings.';
-      
+      // Handle specific error cases - just log instead of showing alerts
+      console.log('Location error:', error);
       if (error.code === 'LOCATION_UNAVAILABLE') {
-        errorMessage = 'Location is currently unavailable. Please try again.';
+        console.log('Location is currently unavailable');
       } else if (error.code === 'LOCATION_TIMEOUT') {
-        errorMessage = 'Location request timed out. Please try again.';
+        console.log('Location request timed out');
       }
-      
-      Alert.alert('Location Error', errorMessage);
       return null;
     }
   }
