@@ -1,11 +1,11 @@
 const { z } = require('zod');
 
-// Geographic coordinate schema (lat/lng roughly covering Egypt bounds)
+// Geographic coordinate schema (Egypt lat/lng bounds)
 const coordSchema = z.object({
   lat: z.number().min(22, { message: 'Latitude must be ≥22' }).max(32, { message: 'Latitude must be ≤32' }),
   lng: z.number().min(25, { message: 'Longitude must be ≥25' }).max(37, { message: 'Longitude must be ≤37' }),
   name: z.string().optional(),
-  zone: z.string().optional() // Zone name like 'University', 'Toreil', etc.
+  zone: z.string().optional() // Deprecated: human-readable zone name (kept for backward compatibility)
 });
 
 // Main trip submission schema
@@ -31,8 +31,8 @@ const tripSchema = z.object({
   month: z.number().int().min(1).max(12).optional(), // 1-12
   day_of_month: z.number().int().min(1).max(31).optional(), // 1-31
   speed_kmh: z.number().positive().max(120).optional(), // Derived from distance/duration
-  from_zone: z.string().optional(), // Zone name for ML
-  to_zone: z.string().optional() // Zone name for ML
+  from_zone: z.string().optional(), // H3 cell id for origin
+  to_zone: z.string().optional() // H3 cell id for destination
 });
 
 module.exports = { tripSchema }; 

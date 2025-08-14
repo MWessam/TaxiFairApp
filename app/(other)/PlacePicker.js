@@ -24,6 +24,7 @@ export default function PlacePicker() {
   const [mapPin, setMapPin] = useState(null);
   const [pinAddress, setPinAddress] = useState('جاري تحديد الموقع...');
   const [isAddressLoading, setIsAddressLoading] = useState(false);
+  const [isMapDragging, setIsMapDragging] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
   const debounceRef = useRef();
   const mapRef = useRef();
@@ -66,11 +67,16 @@ export default function PlacePicker() {
             }
           }
         } else {
-          Alert.alert('يرجى السماح للتطبيق بالوصول إلى الموقع');
+          console.log('Location permission denied, using Cairo as default');
+          // Don't show alert - just use default location silently
+          const fallbackCoords = { latitude: 30.0444, longitude: 31.2357 };
+          setCurrentLocation(fallbackCoords);
+          setMapPin(fallbackCoords);
+          setPinAddress('ميدان التحرير، القاهرة');
         }
       } catch (error) {
         console.log('Location error:', error);
-        // Fallback to Cairo if location fails
+        // Fallback to Cairo if location fails - no alert needed
         const fallbackCoords = { latitude: 30.0444, longitude: 31.2357 };
         setCurrentLocation(fallbackCoords);
         setMapPin(fallbackCoords);
@@ -96,9 +102,11 @@ export default function PlacePicker() {
     }
     setLoading(true);
     try {
-      const data = await searchPlacesMapbox(query, currentLocation);
+      // Pass currentLocation only if it exists, otherwise search will use default location
+      const data = await searchPlacesMapbox(query, currentLocation || null);
       setResults(data);
     } catch (err) {
+      console.log('Search error:', err);
       setResults([]);
     }
     setLoading(false);
@@ -225,7 +233,7 @@ export default function PlacePicker() {
   // Map logic
   const openMap = async () => {
     try {
-      // Always get fresh location when opening map
+      // Try to get current location, but don't fail if permission denied
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
         let loc = await Location.getCurrentPositionAsync({
@@ -237,7 +245,11 @@ export default function PlacePicker() {
         
         // Validate coordinates are not at (0,0) or invalid
         if (coords.latitude === 0 && coords.longitude === 0) {
-          Alert.alert('خطأ', 'لا يمكن تحديد موقعك الحالي. يرجى المحاولة مرة أخرى.');
+          console.log('Invalid coordinates, using Cairo default');
+          const fallbackCoords = { latitude: 30.0444, longitude: 31.2357 };
+          setCurrentLocation(fallbackCoords);
+          setMapPin(fallbackCoords);
+          setShowMap(true);
           return;
         }
         
@@ -245,11 +257,21 @@ export default function PlacePicker() {
         setMapPin(coords);
         setShowMap(true);
       } else {
-        Alert.alert('يرجى السماح للتطبيق بالوصول إلى الموقع');
+        console.log('Location permission denied, opening map with Cairo default');
+        // Permission denied - still open map with Cairo default
+        const fallbackCoords = { latitude: 30.0444, longitude: 31.2357 };
+        setCurrentLocation(fallbackCoords);
+        setMapPin(fallbackCoords);
+        setShowMap(true);
       }
     } catch (error) {
       console.log('Location error:', error);
-      Alert.alert('خطأ', 'لا يمكن الحصول على موقعك الحالي');
+      console.log('Opening map with Cairo default due to location error');
+      // Location failed - still open map with Cairo default
+      const fallbackCoords = { latitude: 30.0444, longitude: 31.2357 };
+      setCurrentLocation(fallbackCoords);
+      setMapPin(fallbackCoords);
+      setShowMap(true);
     }
   };
 
@@ -260,22 +282,36 @@ export default function PlacePicker() {
       setIsAddressLoading(true);
       setPinAddress('...');
       
-             // Debounce the reverse geocoding to avoid too many API calls
-       const timeoutId = setTimeout(() => {
-         console.log('Reverse geocoding for:', mapPin); // Debug log
-         reverseGeocode(mapPin.latitude, mapPin.longitude).then(address => {
-           setPinAddress(address || 'موقع غير محدد');
-           setIsAddressLoading(false);
-         }).catch(err => {
-           console.error('Reverse geocoding error:', err);
-           setPinAddress('موقع غير محدد');
-           setIsAddressLoading(false);
-         });
-       }, 150);
+      // Debounce the reverse geocoding to avoid too many API calls
+      const timeoutId = setTimeout(() => {
+        console.log('Reverse geocoding for:', mapPin); // Debug log
+        reverseGeocode(mapPin.latitude, mapPin.longitude).then(address => {
+          setPinAddress(address || 'موقع غير محدد');
+          setIsAddressLoading(false);
+        }).catch(err => {
+          console.error('Reverse geocoding error:', err);
+          setPinAddress('موقع غير محدد');
+          setIsAddressLoading(false);
+        });
+      }, 300); // Increased debounce time for better performance
 
       return () => clearTimeout(timeoutId);
     }
   }, [mapPin?.latitude, mapPin?.longitude, showMap]);
+
+  // Debounced map pin update for smoother dragging experience
+  const debouncedSetMapPin = React.useCallback(
+    React.useMemo(() => {
+      let timeoutId;
+      return (coords) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          setMapPin(coords);
+        }, 100); // Small delay for smoother updates
+      };
+    }, []),
+    []
+  );
 
   // Handle picking from map
   const handleMapLocationSelect = () => {
@@ -305,7 +341,7 @@ export default function PlacePicker() {
       
       // Validate coordinates
       if (newPin.latitude === 0 && newPin.longitude === 0) {
-        Alert.alert('خطأ', 'لا يمكن تحديد موقعك الحالي. يرجى المحاولة مرة أخرى.');
+        console.log('Invalid coordinates from current location, keeping current pin');
         return;
       }
       
@@ -319,7 +355,9 @@ export default function PlacePicker() {
         });
       }
     } catch (error) {
-      Alert.alert('خطأ', 'لا يمكن الحصول على الموقع الحالي');
+      console.log('Could not get current location:', error);
+      // Don't show alert - just log the error and keep current functionality
+      // User can still manually move the map or search for locations
     }
   };
 
@@ -346,20 +384,41 @@ export default function PlacePicker() {
             style={styles.map}
             center={currentLocation ? [currentLocation.longitude, currentLocation.latitude] : [31.2357, 30.0444]}
             zoom={16}
-            onRegionDidChange={(e) => {
-              console.log('🎯 PlacePicker received onRegionDidChange:', e);
+            onRegionIsChanging={(e) => {
+              console.log('🔄 PlacePicker received onRegionIsChanging:', e);
+              setIsMapDragging(true); // Set dragging state to true
               try {
                 // Support both native (@rnmapbox/maps) and web wrapper event shapes
                 if (e && e.geometry && Array.isArray(e.geometry.coordinates)) {
                   const [lng, lat] = e.geometry.coordinates;
-                  console.log('📍 Setting mapPin from geometry:', { lat, lng });
+                  console.log('📍 Setting mapPin from onRegionIsChanging:', { lat, lng });
+                  debouncedSetMapPin({ latitude: lat, longitude: lng });
+                } else if (e && e.nativeEvent && e.nativeEvent.geometry && Array.isArray(e.nativeEvent.geometry.coordinates)) {
+                  const [lng, lat] = e.nativeEvent.geometry.coordinates;
+                  console.log('📍 Setting mapPin from onRegionIsChanging nativeEvent:', { lat, lng });
+                  debouncedSetMapPin({ latitude: lat, longitude: lng });
+                } else {
+                  console.warn('⚠️ PlacePicker: Could not extract coordinates from onRegionIsChanging event:', e);
+                }
+              } catch (error) {
+                console.log('❌ PlacePicker onRegionIsChanging error:', error);
+              }
+            }}
+            onRegionDidChange={(e) => {
+              console.log('🎯 PlacePicker received onRegionDidChange:', e);
+              setIsMapDragging(false); // Set dragging state to false
+              try {
+                // Support both native (@rnmapbox/maps) and web wrapper event shapes
+                if (e && e.geometry && Array.isArray(e.geometry.coordinates)) {
+                  const [lng, lat] = e.geometry.coordinates;
+                  console.log('📍 Setting mapPin from onRegionDidChange:', { lat, lng });
                   setMapPin({ latitude: lat, longitude: lng });
                 } else if (e && e.nativeEvent && e.nativeEvent.geometry && Array.isArray(e.nativeEvent.geometry.coordinates)) {
                   const [lng, lat] = e.nativeEvent.geometry.coordinates;
-                  console.log('📍 Setting mapPin from nativeEvent:', { lat, lng });
+                  console.log('📍 Setting mapPin from onRegionDidChange nativeEvent:', { lat, lng });
                   setMapPin({ latitude: lat, longitude: lng });
                 } else {
-                  console.warn('⚠️ PlacePicker: Could not extract coordinates from event:', e);
+                  console.warn('⚠️ PlacePicker: Could not extract coordinates from onRegionDidChange event:', e);
                 }
               } catch (error) {
                 console.log('❌ PlacePicker onRegionDidChange error:', error);
@@ -371,10 +430,10 @@ export default function PlacePicker() {
             }}
           >
             {/* Native-specific children will be rendered only on native platforms */}
-            {currentLocation && (
+            {(currentLocation || { latitude: 30.0444, longitude: 31.2357 }) && (
               <MapboxGL.Camera
                 ref={cameraRef}
-                centerCoordinate={[currentLocation.longitude, currentLocation.latitude]}
+                centerCoordinate={[currentLocation?.longitude || 31.2357, currentLocation?.latitude || 30.0444]}
                 zoomLevel={16}
                 animationDuration={0}
                 animationType="none"
@@ -392,9 +451,9 @@ export default function PlacePicker() {
           {/* Center Pin */}
           <View style={styles.centerPin}>
             <Ionicons name="location" size={32} color={theme.primary} />
-            <View style={[styles.pinLabel, isAddressLoading && styles.pinLabelLoading]}>
+            <View style={[styles.pinLabel, (isAddressLoading || isMapDragging) && styles.pinLabelLoading]}>
               <Text style={styles.pinLabelText} numberOfLines={1}>
-                {isAddressLoading ? '...' : pinAddress}
+                {isMapDragging ? 'جاري التحديث...' : (isAddressLoading ? '...' : pinAddress)}
               </Text>
             </View>
           </View>
@@ -407,32 +466,40 @@ export default function PlacePicker() {
           {/* Bottom Controls */}
           <View style={styles.mapBottomPanel}>
             <View style={styles.mapBottomContent}>
+              {!currentLocation && (
+                <View style={styles.locationNotice}>
+                  <Ionicons name="information-circle" size={16} color={theme.primary} />
+                  <Text style={styles.locationNoticeText}>
+                    يمكنك التنقل في الخريطة والبحث عن المواقع يدوياً
+                  </Text>
+                </View>
+              )}
               <View style={styles.locationTitleContainer}>
                 <Text style={styles.mapLocationTitle} numberOfLines={2}>
-                  {isAddressLoading ? '...' : pinAddress}
+                  {isMapDragging ? 'جاري التحديث...' : (isAddressLoading ? '...' : pinAddress)}
                 </Text>
-                {isAddressLoading && (
+                {(isAddressLoading || isMapDragging) && (
                   <ActivityIndicator size="small" color={theme.primary} style={styles.loadingIndicator} />
                 )}
               </View>
               <Text style={styles.mapLocationSubtitle}>
-                {isAddressLoading ? 'جاري تحديد العنوان...' : 'حرك الخريطة لاختيار المكان'}
+                {isMapDragging ? 'حرك الخريطة لاختيار المكان' : (isAddressLoading ? 'جاري تحديد العنوان...' : 'حرك الخريطة لاختيار المكان')}
               </Text>
 
               <View style={styles.mapButtonsRow}>
                 <TouchableOpacity 
-                  style={[styles.mapCancelButton, isAddressLoading && styles.disabledButton]} 
+                  style={[styles.mapCancelButton, (isAddressLoading || isMapDragging) && styles.disabledButton]} 
                   onPress={() => setShowMap(false)}
-                  disabled={isAddressLoading}
+                  disabled={isAddressLoading || isMapDragging}
                 >
-                  <Text style={[styles.mapCancelButtonText, isAddressLoading && styles.disabledButtonText]}>إلغاء</Text>
+                  <Text style={[styles.mapCancelButtonText, (isAddressLoading || isMapDragging) && styles.disabledButtonText]}>إلغاء</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={[styles.mapConfirmButton, isAddressLoading && styles.disabledButton]} 
+                  style={[styles.mapConfirmButton, (isAddressLoading || isMapDragging) && styles.disabledButton]} 
                   onPress={handleMapLocationSelect}
-                  disabled={isAddressLoading}
+                  disabled={isAddressLoading || isMapDragging}
                 >
-                  <Text style={[styles.mapConfirmButtonText, isAddressLoading && styles.disabledButtonText]}>تأكيد الموقع</Text>
+                  <Text style={[styles.mapConfirmButtonText, (isAddressLoading || isMapDragging) && styles.disabledButtonText]}>تأكيد الموقع</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -476,6 +543,11 @@ export default function PlacePicker() {
             <Ionicons name="map" size={20} color="#3B82F6" style={styles.mapOptionIcon} />
             <Text style={styles.mapOptionText}>اختر من الخريطة</Text>
           </TouchableOpacity>
+          {!currentLocation && (
+            <Text style={styles.mapOptionSubtext}>
+              يمكنك استخدام الخريطة حتى بدون تحديد موقعك الحالي
+            </Text>
+          )}
         </View>
 
         {/* Favorite Locations (when no search) */}
@@ -653,6 +725,12 @@ const createStyles = (theme) => StyleSheet.create({
     color: theme.text,
     flex: 1,
   },
+  mapOptionSubtext: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    textAlign: 'center',
+    marginTop: 8,
+  },
   favoritesSection: {
     paddingHorizontal: 16,
     marginBottom: 16,
@@ -771,7 +849,7 @@ const createStyles = (theme) => StyleSheet.create({
     justifyContent: 'center',
   },
   pinLabel: {
-    display: 'none',
+    display: 'flex', // Changed from 'none' to 'flex' to show during dragging
     width: '100%',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
@@ -885,5 +963,21 @@ const createStyles = (theme) => StyleSheet.create({
   },
   disabledButtonText: {
     opacity: 0.7,
+  },
+  locationNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E0F2FE',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    alignSelf: 'center',
+  },
+  locationNoticeText: {
+    fontSize: 14,
+    color: theme.primary,
+    marginLeft: 8,
+    fontWeight: '500',
   },
 });

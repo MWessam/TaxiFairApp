@@ -2,14 +2,17 @@ const { onCall } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 const crypto = require('crypto');
 const { tripSchema } = require('./schema');
-// Lazy load zone manager
-let zoneManager;
+const h3 = require('h3-js');
 
-function getZoneManager() {
-  if (!zoneManager) {
-    zoneManager = require('./zone-manager');
+const H3_RESOLUTION = parseInt(process.env.H3_RESOLUTION || '7', 10);
+
+// H3 zone helper (resolution from env, defaults to 7)
+function computeH3Zone(lat, lng, resolution = H3_RESOLUTION) {
+  try {
+    return h3.latLngToCell(lat, lng, resolution);
+  } catch (_err) {
+    return null;
   }
-  return zoneManager;
 }
 
 // Vertex AI will be loaded when needed
@@ -79,7 +82,7 @@ const calculateIQR = (arr) => {
         upperBound: q3 + 1.5 * iqr,
     };
 };
-// Zone determination is now handled by zone-manager.js
+// Zone determination is handled by H3 hex indexing
 
 // Function to extract ML features from trip data
 function extractMLFeatures(tripData) {
@@ -124,12 +127,12 @@ function extractMLFeatures(tripData) {
     features.speed_kmh = (tripData.distance / tripData.duration) * 60;
   }
   
-  // Extract zone features
+  // Extract zone features using H3
   if (tripData.from?.lat && tripData.from?.lng) {
-    features.from_zone = getZoneManager().getZoneFromCoordinates(tripData.from.lat, tripData.from.lng);
+    features.from_zone = computeH3Zone(tripData.from.lat, tripData.from.lng);
   }
   if (tripData.to?.lat && tripData.to?.lng) {
-    features.to_zone = getZoneManager().getZoneFromCoordinates(tripData.to.lat, tripData.to.lng);
+    features.to_zone = computeH3Zone(tripData.to.lat, tripData.to.lng);
   }
   
   return features;
@@ -172,19 +175,17 @@ function validateTripFeasibility(tripData) {
     }
   }
   
-  // Location validation - Updated for Mansoura specifically
+  // Location validation for Egypt bounds (global app, Egypt only data)
   if (tripData.from && tripData.from.lat && tripData.from.lng) {
-    // Mansoura coordinates roughly: lat 31.04, lng 31.37
-    if (tripData.from.lat < 30.9 || tripData.from.lat > 31.2 || 
-        tripData.from.lng < 31.3 || tripData.from.lng > 31.5) {
-      errors.push('Start location seems outside Mansoura area');
+    if (tripData.from.lat < 22 || tripData.from.lat > 32 ||
+        tripData.from.lng < 25 || tripData.from.lng > 37) {
+      errors.push('Start location must be within Egypt');
     }
   }
-  
   if (tripData.to && tripData.to.lat && tripData.to.lng) {
-    if (tripData.to.lat < 30.9 || tripData.to.lat > 31.2 || 
-        tripData.to.lng < 31.3 || tripData.to.lng > 31.5) {
-      errors.push('End location seems outside Mansoura area');
+    if (tripData.to.lat < 22 || tripData.to.lat > 32 ||
+        tripData.to.lng < 25 || tripData.to.lng > 37) {
+      errors.push('End location must be within Egypt');
     }
   }
   
@@ -688,19 +689,33 @@ exports.analyzeSimilarTrips = onCall({
       throw new Error('Invalid distance parameter');
     }
     
+    // Egypt bounds validation for analysis
     if (fromLat && (fromLat < 22 || fromLat > 32)) {
-      if (process.env.DEBUG_LOGS === 'true') {
-        console.log('Start latitude validation failed:', { fromLat });
-      }
-      throw new Error('Invalid start latitude');
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Start latitude validation failed:', { fromLat });
+    }
+    throw new Error('Invalid start latitude');
     }
     
-    if (toLat && (toLat < 22 || toLat > 32)) {
-      if (process.env.DEBUG_LOGS === 'true') {
-        console.log('End latitude validation failed:', { toLat });
-      }
-      throw new Error('Invalid end latitude');
+  if (toLat && (toLat < 22 || toLat > 32)) {
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('End latitude validation failed:', { toLat });
     }
+    throw new Error('Invalid end latitude');
+    }
+  
+  if (fromLng && (fromLng < 25 || fromLng > 37)) {
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('Start longitude validation failed:', { fromLng });
+    }
+    throw new Error('Invalid start longitude');
+  }
+  if (toLng && (toLng < 25 || toLng > 37)) {
+    if (process.env.DEBUG_LOGS === 'true') {
+      console.log('End longitude validation failed:', { toLng });
+    }
+    throw new Error('Invalid end longitude');
+  }
 
     // Calculate time range
     const startDate = new Date(startTime);
@@ -733,9 +748,9 @@ exports.analyzeSimilarTrips = onCall({
       });
     }
 
-    // Convert coordinates to zones
-    const fromZone = fromLat && fromLng ? getZoneManager().getZoneFromCoordinates(fromLat, fromLng) : null;
-    const toZone = toLat && toLng ? getZoneManager().getZoneFromCoordinates(toLat, toLng) : null;
+    // Convert coordinates to zones (H3)
+    const fromZone = fromLat && fromLng ? computeH3Zone(fromLat, fromLng) : null;
+    const toZone = toLat && toLng ? computeH3Zone(toLat, toLng) : null;
 
     if (process.env.DEBUG_LOGS === 'true') {
       console.log('Zone calculations:', { fromZone, toZone });
@@ -1296,6 +1311,143 @@ exports.getUserRole = onCall({
     
   } catch (error) {
     console.error('Error getting user role:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}); 
+
+// Function to backfill H3 zones for existing trips
+exports.backfillH3Zones = onCall({
+  memory: '1GiB',
+  timeoutSeconds: 540 // 9 minutes max
+}, async (request) => {
+  const { data } = request;
+  const context = request.auth;
+  
+  try {
+    // Only allow authenticated users
+    if (!context || !context.uid) {
+      throw new Error('Authentication required');
+    }
+    
+    // Check if user is admin (only admins can backfill)
+    const isAdmin = await isAdminUser(context.uid);
+    if (!isAdmin) {
+      throw new Error('Only admins can perform H3 zone backfill');
+    }
+    
+    const { batchSize = 100, maxBatches = 50 } = data || {};
+    
+    console.log(`Starting H3 zone backfill with batch size ${batchSize}, max ${maxBatches} batches`);
+    
+    let totalProcessed = 0;
+    let totalUpdated = 0;
+    let totalSkipped = 0;
+    let batchCount = 0;
+    let lastDoc = null;
+    
+    while (batchCount < maxBatches) {
+      // Query for trips
+      let query = db.collection('trips')
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(batchSize);
+      
+      if (lastDoc) {
+        query = query.startAfter(lastDoc.id);
+      }
+      
+      const snapshot = await query.get();
+      if (snapshot.empty) {
+        console.log('No more trips to process');
+        break;
+      }
+      
+      const batch = db.batch();
+      let batchUpdates = 0;
+      
+      snapshot.docs.forEach(doc => {
+        const tripData = doc.data();
+        
+        const fromLat = tripData?.from?.lat;
+        const fromLng = tripData?.from?.lng;
+        const toLat = tripData?.to?.lat;
+        const toLng = tripData?.to?.lng;
+        
+        let fromZone = tripData.from_zone;
+        let toZone = tripData.to_zone;
+        
+        // Check if zones need updating (missing or legacy text zones)
+        const isH3Zone = (zone) => {
+          return typeof zone === 'string' && 
+                 /^[0-9a-f]+$/i.test(zone) && 
+                 zone.length >= 5;
+        };
+        
+        const needsFromZone = (!fromZone || !isH3Zone(fromZone)) && 
+                             fromLat != null && fromLng != null;
+        const needsToZone = (!toZone || !isH3Zone(toZone)) && 
+                           toLat != null && toLng != null;
+        
+        if (needsFromZone || needsToZone) {
+          if (needsFromZone) {
+            fromZone = computeH3Zone(fromLat, fromLng);
+          }
+          if (needsToZone) {
+            toZone = computeH3Zone(toLat, toLng);
+          }
+          
+          batch.update(doc.ref, {
+            ...(needsFromZone ? { from_zone: fromZone } : {}),
+            ...(needsToZone ? { to_zone: toZone } : {}),
+            h3_backfilled_at: admin.firestore.FieldValue.serverTimestamp(),
+            h3_resolution: H3_RESOLUTION
+          });
+          
+          batchUpdates++;
+          totalUpdated++;
+        } else {
+          totalSkipped++;
+        }
+        
+        totalProcessed++;
+      });
+      
+      if (batchUpdates > 0) {
+        await batch.commit();
+        console.log(`Batch ${batchCount + 1}: Updated ${batchUpdates} trips`);
+      }
+      
+      lastDoc = snapshot.docs[snapshot.docs.length - 1];
+      batchCount++;
+      
+      // Progress update
+      if (batchCount % 10 === 0) {
+        console.log(`Progress: ${totalProcessed} processed, ${totalUpdated} updated, ${totalSkipped} skipped`);
+      }
+    }
+    
+    console.log(`H3 zone backfill completed:`);
+    console.log(`  Total processed: ${totalProcessed}`);
+    console.log(`  Total updated: ${totalUpdated}`);
+    console.log(`  Total skipped: ${totalSkipped}`);
+    console.log(`  Batches processed: ${batchCount}`);
+    
+    return {
+      success: true,
+      message: 'H3 zone backfill completed successfully',
+      data: {
+        totalProcessed,
+        totalUpdated,
+        totalSkipped,
+        batchesProcessed: batchCount,
+        h3Resolution: H3_RESOLUTION
+      }
+    };
+    
+  } catch (error) {
+    console.error('Error during H3 zone backfill:', error);
     return {
       success: false,
       error: error.message

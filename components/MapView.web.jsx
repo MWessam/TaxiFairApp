@@ -30,6 +30,7 @@ export default function MapViewWeb({
   zoom = 12,
   onClick,
   onRegionDidChange,
+  onRegionIsChanging,
   bounds, // { ne: [lng, lat], sw: [lng, lat], padding?: number }
   webMarkers = [], // [{ lng, lat, color? }]
   webLineCoords = [], // [[lng, lat], ...]
@@ -156,6 +157,12 @@ export default function MapViewWeb({
           mapRef.current.on('moveend', () => {
             const c = mapRef.current.getCenter();
             onRegionDidChange({ geometry: { coordinates: [c.lng, c.lat] } });
+          });
+        }
+        if (onRegionIsChanging) {
+          mapRef.current.on('move', () => {
+            const c = mapRef.current.getCenter();
+            onRegionIsChanging({ geometry: { coordinates: [c.lng, c.lat] } });
           });
         }
       } catch (err) {
