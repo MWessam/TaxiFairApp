@@ -1136,44 +1136,45 @@ exports.analyzeSimilarTrips = onCall({
       return bins.filter(b => b.count > 0).map(b => ({ time: b.label, avgFare: Math.round((b.total / b.count) * 100) / 100 }));
     };
 
-    // Build bell-curve-like ±σ bins from fare distribution
-    const buildBellCurveBins = (fareDistribution, averageFare, fareRange) => {
-      if (!Array.isArray(fareDistribution) || fareDistribution.length === 0) return [];
-      const mean = Number(averageFare) || 0;
-      const min = Number(fareRange?.min ?? 0);
-      const max = Number(fareRange?.max ?? 0);
-      const range = Math.max(0, max - min);
-      const sigma = range > 0 ? range / 6 : 0; // approx 6σ across min..max
-      if (sigma === 0) return [];
+    // Build bell-curve-like ±σ bins from filtered trips' fares with numeric labels and per-bin averages
+    const buildBellCurveBins = (tripsForBins) => {
+      const fares = tripsForBins
+        .map(t => Number(t?.fare))
+        .filter(f => Number.isFinite(f) && f > 0);
+      if (fares.length < 2) return [];
+
+      const mean = fares.reduce((a,b)=>a+b,0) / fares.length;
+      const variance = fares.reduce((a,b)=> a + Math.pow(b - mean, 2), 0) / (fares.length - 1);
+      const sigma = Math.sqrt(Math.max(variance, 0));
+      if (sigma === 0) {
+        const m = Math.round(mean * 100) / 100;
+        return [{ distance: `${m.toFixed(2)}-${m.toFixed(2)}`, avgFare: m }];
+      }
 
       const bins = [
-        { label: '-3σ .. -2σ', from: mean - 3*sigma, to: mean - 2*sigma, count: 0 },
-        { label: '-2σ .. -1σ', from: mean - 2*sigma, to: mean - 1*sigma, count: 0 },
-        { label: '-1σ .. +1σ', from: mean - 1*sigma, to: mean + 1*sigma, count: 0 },
-        { label: '+1σ .. +2σ', from: mean + 1*sigma, to: mean + 2*sigma, count: 0 },
-        { label: '+2σ .. +3σ', from: mean + 2*sigma, to: mean + 3*sigma, count: 0 }
+        { from: mean - 3*sigma, to: mean - 2*sigma, values: [] },
+        { from: mean - 2*sigma, to: mean - 1*sigma, values: [] },
+        { from: mean - 1*sigma, to: mean + 1*sigma, values: [] },
+        { from: mean + 1*sigma, to: mean + 2*sigma, values: [] },
+        { from: mean + 2*sigma, to: mean + 3*sigma, values: [] },
       ];
 
-      const parseRange = (r) => {
-        if (!r || typeof r !== 'string' || !r.includes('-')) return null;
-        const [a, b] = r.split('-').map(n => Number(n));
-        if (!isFinite(a) || !isFinite(b)) return null;
-        return { a: Math.min(a,b), b: Math.max(a,b) };
-      };
-
-      for (const bucket of analysis.fareDistribution) {
-        const pr = parseRange(bucket.range);
-        if (!pr) continue;
-        const center = (pr.a + pr.b) / 2;
-        const cnt = Number(bucket.count || 0);
-        for (const bin of bins) {
-          if (center >= bin.from && center < bin.to) {
-            bin.count += cnt;
-            break;
-          }
+      // Assign fares to bins (left-closed, right-open; last bin right-closed)
+      for (const f of fares) {
+        for (let i = 0; i < bins.length; i++) {
+          const b = bins[i];
+          const inRange = i < bins.length - 1 ? (f >= b.from && f < b.to) : (f >= b.from && f <= b.to);
+          if (inRange) { b.values.push(f); break; }
         }
       }
-      return bins.filter(b => b.count > 0).map(b => ({ distance: b.label, avgFare: b.count }));
+
+      return bins
+        .filter(b => b.values.length > 0)
+        .map(b => {
+          const avg = b.values.reduce((a,v)=>a+v,0) / b.values.length;
+          const label = `${Math.max(0, Math.min(b.from, b.to)).toFixed(2)}-${Math.max(0, Math.max(b.from, b.to)).toFixed(2)}`;
+          return { distance: label, avgFare: Math.round(avg * 100) / 100 };
+        });
     };
     
     if (process.env.DEBUG_LOGS === 'true') {
@@ -1189,8 +1190,8 @@ exports.analyzeSimilarTrips = onCall({
         ...analysis,
         // 3-hour time bins for client display
         timeBins3h: buildTimeBins3h(filteredTrips),
-        // Bell-curve-like ±σ bins derived from fare distribution
-        bellCurveBins: buildBellCurveBins(analysis.fareDistribution, analysis.averageFare, analysis.fareRange),
+        // Bell-curve-like ±σ bins derived from filtered trips, numeric labels with per-bin averages
+        bellCurveBins: buildBellCurveBins(filteredTrips),
         estimatedFare: Math.round(estimatedFare * 100) / 100
       }
     };

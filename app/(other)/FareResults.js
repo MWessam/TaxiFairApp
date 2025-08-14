@@ -389,7 +389,7 @@ export default function FareResults() {
   const analysis = getAnalysisData();
   const styles = createStyles(theme, { contentMaxWidth });
 
-  const CustomBarChart = ({ data, dataKey, title }) => {
+  const CustomBarChart = ({ data, dataKey, title, hideLabels }) => {
     if (!data || data.length === 0) return null;
     
     const maxValue = Math.max(...data.map(item => item[dataKey]));
@@ -405,7 +405,9 @@ export default function FareResults() {
                 <View style={styles.barWrapper}>
                   <View style={[styles.bar, { height: barHeight, backgroundColor: theme.primary }]} />
                 </View>
-                <Text style={styles.barLabel} numberOfLines={1}>{item.distance || item.time || item.day}</Text>
+                {!hideLabels && (
+                  <Text style={styles.barLabel} numberOfLines={1}>{item.distance || item.time || item.day}</Text>
+                )}
                 <Text style={styles.barValue}>{item[dataKey]}</Text>
               </View>
             );
@@ -632,6 +634,7 @@ export default function FareResults() {
                   data={analysis.similarTripsData.slice(0, 4)}
                   dataKey="avgFare"
                   title=""
+                  hideLabels
                 />
               </View>
             </View>
