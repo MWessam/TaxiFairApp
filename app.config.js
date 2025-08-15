@@ -1,7 +1,7 @@
 import 'dotenv/config';
 export default {
   "expo": {
-    "name": "Kam El Ogra",
+    "name": "كام الأجرة",
     "slug": "kam-el-ogra",
     "version": "1.3.1",
     "orientation": "portrait",
@@ -48,10 +48,10 @@ export default {
       "output": "static",
       "favicon": "./assets/images/cair_icon_transparent.png",
       "meta": {
-        "name": "Kam El Ogra - Taxi Fare Calculator",
-        "description": "Calculate taxi fares in Egypt with real-time tracking and route estimation. Get accurate fare estimates for your taxi rides.",
-        "keywords": "taxi, fare, calculator, Egypt, Cairo, transportation, ride, estimate",
-        "author": "Kam El Ogra",
+        "name": "كام الأجرة - حاسبة أسعار التاكسي",
+        "description": "احسب أسعار التاكسي في مصر مع التتبع المباشر وتقدير المسار. احصل على تقديرات دقيقة لرحلات التاكسي الخاصة بك.",
+        "keywords": "تاكسي, أجرة, حاسبة, مصر, القاهرة, نقل, رحلة, تقدير",
+        "author": "كام الأجرة",
         "viewport": "width=device-width, initial-scale=1.0",
         "robots": "index, follow",
         "google-adsense-account": "ca-pub-8401949226434611"

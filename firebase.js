@@ -1,4 +1,4 @@
-// Kam El Ogra - Firebase Configuration
+// كام الأجرة - Firebase Configuration
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";

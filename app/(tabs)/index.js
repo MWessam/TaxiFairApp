@@ -146,7 +146,7 @@ export default function Home() {
             <Ionicons name="person-circle" size={24} color={theme.primary} />
           </TouchableOpacity>
           <View style={styles.headerTextContainer}>
-            <Text style={styles.appTitle}>تاكسي مصر</Text>
+            <Text style={styles.appTitle}>كام الأجرة</Text>
             <Text style={styles.subtitle}>تتبع أسعار التاكسي في مصر</Text>
             {user && (
               <Text style={styles.userInfo}>

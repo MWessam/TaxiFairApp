@@ -1,6 +1,6 @@
 # Google Authentication Setup Guide
 
-This guide will help you set up Google authentication for the Kam El Ogra app with automatic Google sign-in.
+This guide will help you set up Google authentication for the كام الأجرة app with automatic Google sign-in.
 
 ## Prerequisites
 
