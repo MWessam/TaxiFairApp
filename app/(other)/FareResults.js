@@ -631,15 +631,15 @@ export default function FareResults() {
                     <Ionicons name="trending-up" size={20} color={theme.primary} />
                     <Text style={styles.chartHeaderText}>أكثر 5 أسعار شيوعاً</Text>
                   </View>
-                  <CustomBarChart
-                    data={analysisData.data.top5Fares.map(fare => ({
-                      fare: fare.fare,
-                      count: fare.count
-                    }))}
-                    dataKey="count"
-                    title=""
-                    hideLabels
-                  />
+                                     <CustomBarChart
+                     data={analysisData.data.top5Fares.map(fare => ({
+                       fare: fare.fare,
+                       count: fare.count
+                     }))}
+                     dataKey="fare"
+                     title=""
+                     hideLabels
+                   />
                 </View>
               </View>
             )}
