@@ -623,21 +623,31 @@ export default function FareResults() {
               </View>
             )}
 
-            {/* Similar Trips Chart */}
-            <View style={styles.card}>
-              <View style={styles.cardContent}>
-                <View style={styles.chartHeader}>
-                  <Ionicons name="trending-up" size={20} color={theme.primary} />
-                  <Text style={styles.chartHeaderText}>متوسط الأسعار للرحلات المشابهة</Text>
+            {/* Top 5 Most Common Fares */}
+            {analysisData && analysisData.success && analysisData.data && analysisData.data.top5Fares && analysisData.data.top5Fares.length > 0 && (
+              <View style={styles.card}>
+                <View style={styles.cardContent}>
+                  <View style={styles.chartHeader}>
+                    <Ionicons name="trending-up" size={20} color={theme.primary} />
+                    <Text style={styles.chartHeaderText}>أكثر 5 أسعار شيوعاً</Text>
+                  </View>
+                  <View style={styles.top5FaresContainer}>
+                    {analysisData.data.top5Fares.map((fareData, index) => (
+                      <View key={index} style={styles.fareItem}>
+                        <View style={styles.fareValueContainer}>
+                          <Text style={styles.fareValue}>{fareData.fare} جنيه</Text>
+                          <Text style={styles.fareCount}>({fareData.count} رحلة)</Text>
+                        </View>
+                        <View style={styles.farePercentageContainer}>
+                          <View style={[styles.farePercentageBar, { width: `${fareData.percentage}%` }]} />
+                          <Text style={styles.farePercentage}>{fareData.percentage}%</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-                <CustomBarChart
-                  data={analysis.similarTripsData.slice(0, 4)}
-                  dataKey="avgFare"
-                  title=""
-                  hideLabels
-                />
               </View>
-            </View>
+            )}
 
             {/* Time-based Chart */}
             <View style={styles.card}>
@@ -1076,5 +1086,48 @@ const createStyles = (theme, { contentMaxWidth }) => StyleSheet.create({
     fontSize: 12,
     color: theme.textSecondary,
     marginLeft: 4,
+  },
+  top5FaresContainer: {
+    marginTop: 16,
+  },
+  fareItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  fareValueContainer: {
+    flex: 1,
+  },
+  fareValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: theme.text,
+  },
+  fareCount: {
+    fontSize: 14,
+    color: theme.textSecondary,
+    marginTop: 2,
+  },
+  farePercentageContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  farePercentageBar: {
+    height: 8,
+    backgroundColor: theme.primary,
+    borderRadius: 4,
+    marginRight: 8,
+    minWidth: 20,
+  },
+  farePercentage: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.text,
+    minWidth: 35,
+    textAlign: 'right',
   },
 }); 

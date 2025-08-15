@@ -44,3 +44,4 @@ credentials/
 android/app/build
 
 builds/
+functions/firebase-debug.log
