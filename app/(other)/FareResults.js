@@ -405,9 +405,9 @@ export default function FareResults() {
                 <View style={styles.barWrapper}>
                   <View style={[styles.bar, { height: barHeight, backgroundColor: theme.primary }]} />
                 </View>
-                {!hideLabels && (
-                  <Text style={styles.barLabel} numberOfLines={1}>{item.distance || item.time || item.day}</Text>
-                )}
+                                 {!hideLabels && (
+                   <Text style={styles.barLabel} numberOfLines={1}>{item.distance || item.time || item.day || item.fare}</Text>
+                 )}
                 <Text style={styles.barValue}>{item[dataKey]}</Text>
               </View>
             );
@@ -631,20 +631,15 @@ export default function FareResults() {
                     <Ionicons name="trending-up" size={20} color={theme.primary} />
                     <Text style={styles.chartHeaderText}>أكثر 5 أسعار شيوعاً</Text>
                   </View>
-                  <View style={styles.top5FaresContainer}>
-                    {analysisData.data.top5Fares.map((fareData, index) => (
-                      <View key={index} style={styles.fareItem}>
-                        <View style={styles.fareValueContainer}>
-                          <Text style={styles.fareValue}>{fareData.fare} جنيه</Text>
-                          <Text style={styles.fareCount}>({fareData.count} رحلة)</Text>
-                        </View>
-                        <View style={styles.farePercentageContainer}>
-                          <View style={[styles.farePercentageBar, { width: `${fareData.percentage}%` }]} />
-                          <Text style={styles.farePercentage}>{fareData.percentage}%</Text>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
+                  <CustomBarChart
+                    data={analysisData.data.top5Fares.map(fare => ({
+                      fare: fare.fare,
+                      count: fare.count
+                    }))}
+                    dataKey="count"
+                    title=""
+                    hideLabels
+                  />
                 </View>
               </View>
             )}
@@ -1087,47 +1082,5 @@ const createStyles = (theme, { contentMaxWidth }) => StyleSheet.create({
     color: theme.textSecondary,
     marginLeft: 4,
   },
-  top5FaresContainer: {
-    marginTop: 16,
-  },
-  fareItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  fareValueContainer: {
-    flex: 1,
-  },
-  fareValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: theme.text,
-  },
-  fareCount: {
-    fontSize: 14,
-    color: theme.textSecondary,
-    marginTop: 2,
-  },
-  farePercentageContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 80,
-  },
-  farePercentageBar: {
-    height: 8,
-    backgroundColor: theme.primary,
-    borderRadius: 4,
-    marginRight: 8,
-    minWidth: 20,
-  },
-  farePercentage: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.text,
-    minWidth: 35,
-    textAlign: 'right',
-  },
+
 }); 
